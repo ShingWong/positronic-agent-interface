@@ -1,0 +1,31 @@
+# =====================================================================
+# Project Positronic — Polytemporal Cognitive Engram Memory Substrate
+# Copyright (C) 2026 Shing Wong. All Rights Reserved.
+# =====================================================================
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://gnu.org>.
+# =====================================================================
+
+"""Engine open helper — resolve a project brain DB to (store, engine)."""
+import pathlib
+
+from memeng.store import SQLiteStore
+from memeng.engine import MemoryEngine
+
+def open_engine(project_dir, brain: str):
+    db = pathlib.Path(project_dir) / ".positronic" / "brains" / brain / "memory.db"
+    if not db.exists():
+        raise FileNotFoundError(f"no such brain db: {db}")
+    s = SQLiteStore(str(db))
+    e = MemoryEngine(s)
+    return s, e
