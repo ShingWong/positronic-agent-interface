@@ -29,10 +29,14 @@ _OBJECT_SQL = ("SELECT id, canonical_name, kind, status, salience, "
                "WHERE canonical_name = ? OR canonical_name LIKE ? "
                "ORDER BY (canonical_name = ?) DESC LIMIT 1")
 _SIGHTINGS_SQL = ("SELECT os.episode_id, os.channel, os.confidence, "
-                  "e.tau, e.wall, e.subject_norm, e.kind "
+                  "e.tau, e.wall, e.subject_norm, e.kind, "
+                  "COALESCE(e.subject_norm, "
+                  "json_extract(e.features_json,'$.body_text')) AS body_text "
                   "FROM object_sighting os JOIN episode e ON os.episode_id=e.id "
                   "WHERE os.object_id = ? ORDER BY e.tau DESC")
-_CONSOLIDATION_SQL = ("SELECT e.subject_norm FROM object_sighting os "
+_CONSOLIDATION_SQL = ("SELECT COALESCE(e.subject_norm, "
+                      "json_extract(e.features_json,'$.body_text')) "
+                      "AS subject_norm FROM object_sighting os "
                       "JOIN episode e ON os.episode_id=e.id "
                       "WHERE os.object_id = ? AND e.kind='consolidation' "
                       "ORDER BY e.tau DESC LIMIT 1")
