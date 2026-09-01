@@ -71,3 +71,23 @@ def test_object_digest_latest_consolidation_uses_body_text():
         s.conn.commit()
         digest = object_digest(s, oid)
         assert "08fcde5" in digest["latest_consolidation"]
+
+
+# hyphenated canonical names (positronic-opencode-plugin) must fuzzy-resolve
+# from a spaced cue ("opencode plugin") — entity extraction hyphenates, agents
+# cue with spaces.
+def test_resolve_object_hyphen_name_from_spaced_cue():
+    import tempfile
+
+    from positronic_ai.objects import resolve_object
+    with tempfile.TemporaryDirectory() as d:
+        s, _e, _oid = _seed_object_with_null_subject(d)
+        s.conn.execute(
+            "INSERT INTO object(id, canonical_name, kind, domain_id, status, "
+            "salience, first_seen_tau, last_seen_tau) "
+            "VALUES (lower(hex(randomblob(16))), 'positronic-opencode-plugin', "
+            "'entity', 1, 'active', 0.5, 10.0, 10.0)")
+        s.conn.commit()
+        obj = resolve_object(s, "opencode plugin")
+        assert obj is not None
+        assert obj["canonical_name"] == "positronic-opencode-plugin"

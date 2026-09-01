@@ -27,6 +27,7 @@ from __future__ import annotations
 _OBJECT_SQL = ("SELECT id, canonical_name, kind, status, salience, "
                "first_seen_tau, last_seen_tau FROM object "
                "WHERE canonical_name = ? OR canonical_name LIKE ? "
+               "OR REPLACE(REPLACE(canonical_name,'-',' '),'_',' ') LIKE ? "
                "ORDER BY (canonical_name = ?) DESC LIMIT 1")
 _SIGHTINGS_SQL = ("SELECT os.episode_id, os.channel, os.confidence, "
                   "e.tau, e.wall, e.subject_norm, e.kind, "
@@ -47,13 +48,19 @@ _DIGEST_SQL = ("SELECT COUNT(*) AS sighting_count, "
                "WHERE os.object_id = ?")
 
 def resolve_object(store, object_name: str) -> dict | None:
-    """Fuzzy object lookup; returns the object row dict or None."""
+    """Fuzzy object lookup; returns the object row dict or None.
+
+    Matches the exact name, a substring, or a hyphen/underscore-normalized
+    variant (entity extraction hyphenates 'opencode plugin'; agents cue with
+    spaces). Exact match ranks first.
+    """
     object_name = (object_name or "").strip()
     if not object_name:
         return None
     like = f"%{object_name}%"
-    row = store.conn.execute(_OBJECT_SQL,
-                             (object_name, like, object_name)).fetchone()
+    row = store.conn.execute(
+        _OBJECT_SQL,
+        (object_name, like, like, object_name)).fetchone()
     return dict(row) if row else None
 
 def object_sightings(store, object_id: str) -> list[dict]:
