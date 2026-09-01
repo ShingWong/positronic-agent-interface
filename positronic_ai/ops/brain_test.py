@@ -24,10 +24,11 @@ from memeng.models import Event
 
 from ..engine import open_engine
 
+
 def run(dir, *, brain="kairos", k=3) -> dict:
     """Write a probe event, time encode + recall, return {ok, encode_ms, recall_ms, hits, fallback, rrf_score}."""
     k = k or 3
-    s, e = open_engine(dir, brain)
+    _s, e = open_engine(dir, brain)
 
     t0 = time.perf_counter()
     e.new_event(Event(stream=f"positronic:{brain}", kind="message",

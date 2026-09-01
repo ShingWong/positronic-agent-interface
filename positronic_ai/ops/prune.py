@@ -22,6 +22,7 @@ from dataclasses import asdict
 from ..config import load_config
 from ..engine import open_engine
 
+
 def run(dir, *, brain=None, tau_now=None) -> dict:
     """Prune expired/merged episodes; returns PruneReport as dict.
 
@@ -33,6 +34,6 @@ def run(dir, *, brain=None, tau_now=None) -> dict:
     name = brain or next(iter(cfg.get("brains", {})), None)
     if not name:
         raise ValueError("no brains configured — run positronic init")
-    s, e = open_engine(dir, name)
+    _s, e = open_engine(dir, name)
     rep = e.prune(tau_now=tau_now)
     return asdict(rep)

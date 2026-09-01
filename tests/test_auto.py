@@ -111,7 +111,9 @@ def test_auto_disabled_at_zero():
 
 
 def test_init_sets_auto_flags():
-    import subprocess, sys, os
+    import os
+    import subprocess
+    import sys
     env = dict(os.environ)
     env["PYTHONPATH"] = "/usr/local/devel/positronic/positronic-engram/engine/src:" + \
                         "/usr/local/devel/positronic/positronic-agent-interface"
@@ -120,7 +122,7 @@ def test_init_sets_auto_flags():
             [sys.executable, "-m", "positronic_ai", "init",
              "--brain", "kairos", "--profile", "balanced", "--embed", "lexical",
              "--auto-consolidate", "25", "--auto-prune", "500"],
-            cwd=d, env=env, capture_output=True, text=True)
+            cwd=d, env=env, capture_output=True, text=True, check=False)
         assert r.returncode == 0, r.stderr
         cfg = load_config(d)
         assert cfg["auto"] == {"consolidate_every": 25, "prune_every": 500}

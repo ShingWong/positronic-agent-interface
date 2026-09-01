@@ -18,6 +18,7 @@
 
 def test_prune_seed_200():
     import tempfile
+
     from positronic_ai.brains import init_brain
     from positronic_ai.ops.ingest import run as ingest
     from positronic_ai.ops.prune import run as prune
@@ -32,6 +33,7 @@ def test_prune_seed_200():
 
 def test_prune_live_false_skips():
     import tempfile
+
     from positronic_ai.brains import init_brain
     from positronic_ai.config import set_key
     from positronic_ai.ops.prune import run as prune

@@ -19,6 +19,7 @@
 """Init verb — delegate to the wizard (port of plugin init.ts)."""
 from .. import wizard
 
+
 def run(dir, *, brains=None, force=False, live=None,
         auto_consolidate=None, auto_prune=None) -> dict:
     return wizard.init_run(dir, brains=brains, force=force, live=live,

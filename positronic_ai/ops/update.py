@@ -76,12 +76,13 @@ def spawn_job(job_id: str, cmd: str) -> str:
 def run(*, check=False, pin=None, status=None, tail=None, dir=None) -> dict:
     d = dir or os.getcwd()
     if check:
-        r = subprocess.run(
-            ["bash", "-c",
-             f"git -C {shlex.quote(str(d))} ls-remote --heads origin 2>&1 | head; "
-             f"echo '---'; "
-             f"git -C {shlex.quote(str(d))} rev-list --count HEAD..origin/beta 2>&1 | head -1"],
-            capture_output=True, text=True)
+        cmd = (
+            f"git -C {shlex.quote(str(d))} ls-remote --heads origin 2>&1 | head; "
+            f"echo '---'; "
+            f"git -C {shlex.quote(str(d))} rev-list --count "
+            f"HEAD..origin/beta 2>&1 | head -1")
+        r = subprocess.run(["bash", "-c", cmd],
+                           capture_output=True, text=True, check=False)
         m = re.search(r"\d+", r.stdout or "")
         behind = int(m.group(0)) if m else 0
         return {"behind": behind, "engramTagDiff": None,

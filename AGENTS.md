@@ -40,7 +40,8 @@ gitignored and must never be committed.
 ## Commands
 
 ```bash
-PYTHONPATH=/usr/local/devel/positronic/positronic-engram/engine/src:. python3 -m pytest tests/ -q
+pytest -q                # testpaths = ["tests"]; memeng + PAI editable-installed
+ruff check positronic_ai/ tests/
 ```
 
 Every `.py` file carries the GPL-3.0-or-later header; `pyproject.toml` carries

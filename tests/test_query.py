@@ -31,6 +31,7 @@ def _seed(dir, n=3):
 
 def test_query_text_returns_hit():
     import tempfile
+
     from positronic_ai.ops.query import run
     with tempfile.TemporaryDirectory() as d:
         _seed(d)
@@ -41,6 +42,7 @@ def test_query_text_returns_hit():
 
 def test_query_sql_count():
     import tempfile
+
     from positronic_ai.ops.query import run
     with tempfile.TemporaryDirectory() as d:
         _seed(d, n=3)
@@ -49,6 +51,7 @@ def test_query_sql_count():
 
 def test_query_anchors():
     import tempfile
+
     from positronic_ai.ops.query import run
     with tempfile.TemporaryDirectory() as d:
         _seed(d)
@@ -60,6 +63,7 @@ def test_query_anchors():
 
 def test_query_missing_brain():
     import tempfile
+
     from positronic_ai.ops.query import run
     with tempfile.TemporaryDirectory() as d:
         out = run(d, text="anything")

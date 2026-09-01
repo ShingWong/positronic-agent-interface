@@ -17,10 +17,13 @@
 # =====================================================================
 
 """Stats verb — per-brain episode counts + profile/embed help (port of plugin stats.ts)."""
+import logging
 from pathlib import Path
 
 from ..config import load_config
 from ..engine import open_engine
+
+log = logging.getLogger(__name__)
 
 PROFILE_HELP = {
     "balanced": "Keeps recent memories for a few weeks (normal use)",
@@ -42,7 +45,8 @@ def run(dir, *, brain=None) -> dict:
     """
     try:
         cfg = load_config(dir)
-    except Exception:
+    except Exception:  # noqa: BLE001  (config absent → empty brains)
+        log.warning("stats: no config readable — empty brains")
         cfg = {"brains": {}}
     all_brains = cfg.get("brains", {})
     brains = {brain: all_brains.get(brain)} if brain else all_brains
@@ -59,7 +63,8 @@ def run(dir, *, brain=None) -> dict:
             s, _e = open_engine(dir, name)
             row = s.conn.execute("SELECT COUNT(*) c FROM episode").fetchone()
             episodes = int(row["c"])
-        except Exception:
+        except Exception:  # noqa: BLE001  (db corrupt → count 0, don't fail stats)
+            log.warning("stats: brain %s episode count failed", name)
             episodes = 0
         out["brains"][name] = {
             "episodes": episodes,

@@ -18,6 +18,7 @@
 
 def test_info_shape():
     import tempfile
+
     import positronic_ai
     from positronic_ai.brains import init_brain
     from positronic_ai.ops.info import run

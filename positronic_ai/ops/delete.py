@@ -18,10 +18,13 @@
 
 """Delete verb — permanently remove a brain (port of plugin delete.ts)."""
 import json
+import logging
 import shutil
 from pathlib import Path
 
 from ..config import load_config, save_config
+
+log = logging.getLogger(__name__)
 
 
 def _config_path(project_dir) -> Path:
@@ -31,7 +34,8 @@ def _config_path(project_dir) -> Path:
 def _load(project_dir) -> dict:
     try:
         return load_config(project_dir)
-    except Exception:
+    except Exception:  # noqa: BLE001  (config absent → empty brains)
+        log.warning("delete: config unreadable — empty brains assumed")
         return {"brains": {}}
 
 

@@ -25,6 +25,7 @@ from memeng.models import Event
 from ..config import load_config, save_config
 from ..engine import open_engine
 
+
 def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
         dedup=None, role="assistant") -> dict:
     cfg = load_config(dir)

@@ -22,11 +22,14 @@ Public-safe: touches only `.positronic/brains/*` (never the private
 kairos_brain). Per-brain `activate` hits are merged with reciprocal-rank
 fusion (RRF); each hit is tagged with its source brain.
 """
+import logging
 from pathlib import Path
 
 from ..config import load_config
 from ..engine import open_engine
 from ..objects import object_digest, resolve_object
+
+log = logging.getLogger(__name__)
 
 
 def run(dir, text, *, k=8, brains=None) -> dict:
@@ -52,9 +55,10 @@ def run(dir, text, *, k=8, brains=None) -> dict:
         if not db.exists():
             continue
         try:
-            s, e = open_engine(dir, name)
+            _s, e = open_engine(dir, name)
             hits = e.activate({"text": text}, k=k)
-        except Exception:
+        except Exception:  # noqa: BLE001  (federated skip — one bad brain must not fail recall)
+            log.warning("recall: brain %s skipped — open/activate failed", name)
             continue
         for i, hit in enumerate(hits):
             eid = hit.get("episode_id")
@@ -89,7 +93,8 @@ def _resolve_any(project_dir, names, text) -> dict | None:
             continue
         try:
             s, _e = open_engine(project_dir, name)
-        except Exception:
+        except Exception:  # noqa: BLE001  (federated skip — one bad brain must not fail recall)
+            log.warning("recall: object resolve skipped brain %s", name)
             continue
         row = resolve_object(s, text)
         if row is None:

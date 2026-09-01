@@ -20,14 +20,27 @@
 
 __version__ = "0.1.0"
 
-from .config import (ALLOWED_EMBEDS, ALLOWED_PROFILES, CONFIG_KEYS,
-                     ENGRAM_TAG, get_brains, load_config, save_config, set_key)
-
 from . import ops
+from .config import (
+                     ALLOWED_EMBEDS,
+                     ALLOWED_PROFILES,
+                     CONFIG_KEYS,
+                     ENGRAM_TAG,
+                     get_brains,
+                     load_config,
+                     save_config,
+                     set_key,
+)
 
 __all__ = [
-    "__version__",
-    "ops",
-    "load_config", "save_config", "get_brains", "set_key",
-    "ALLOWED_PROFILES", "ALLOWED_EMBEDS", "CONFIG_KEYS", "ENGRAM_TAG",
+                     "ALLOWED_EMBEDS",
+                     "ALLOWED_PROFILES",
+                     "CONFIG_KEYS",
+                     "ENGRAM_TAG",
+                     "__version__",
+                     "get_brains",
+                     "load_config",
+                     "ops",
+                     "save_config",
+                     "set_key",
 ]

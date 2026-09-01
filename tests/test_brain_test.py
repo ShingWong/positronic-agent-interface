@@ -27,6 +27,7 @@ def _seed_brain(dir):
 
 def test_brain_test_probe_hits():
     import tempfile
+
     from positronic_ai.ops.brain_test import run
     with tempfile.TemporaryDirectory() as d:
         _seed_brain(d)
@@ -40,6 +41,7 @@ def test_brain_test_probe_hits():
 
 def test_brain_test_no_brain_db():
     import tempfile
+
     from positronic_ai.ops.brain_test import run
     with tempfile.TemporaryDirectory() as d:
         try:
@@ -50,6 +52,7 @@ def test_brain_test_no_brain_db():
 
 def test_update_check_returns_behind():
     import tempfile
+
     from positronic_ai.ops.update import run
     with tempfile.TemporaryDirectory() as d:
         out = run(check=True, dir=d)

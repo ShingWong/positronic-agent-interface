@@ -19,6 +19,7 @@
 """Consolidate verb — write a consolidation summary as kind='consolidation' event."""
 from .ingest import run as ingest_run
 
+
 def run(dir, text, *, brain=None, arousal=0.4) -> dict:
     """Write a consolidation event; {ok, tau, encoded, episode_id} on success."""
     text = (text or "").strip()

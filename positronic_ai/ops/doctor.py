@@ -23,9 +23,12 @@ import of memeng.store, bge via a 2s urllib health probe, llama via binary
 existence, lexical always ok (FTS5).
 """
 import json
+import logging
 import shutil
 import urllib.request
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 ENGINE_SRC = Path("/usr/local/devel/positronic/positronic-engram/engine/src")
 BGE_URL = "http://127.0.0.1:8090/health"
@@ -49,7 +52,8 @@ def _engram() -> str:
     try:
         import memeng.store  # noqa: F401
         return "ok"
-    except Exception:
+    except Exception:  # noqa: BLE001  (health probe — any import failure = missing)
+        log.warning("doctor: memeng import failed")
         return "missing"
 
 def _bge() -> str:
@@ -57,7 +61,8 @@ def _bge() -> str:
         with urllib.request.urlopen(BGE_URL, timeout=BGE_TIMEOUT) as resp:
             body = json.loads(resp.read().decode("utf-8", "replace"))
         return "ok" if body.get("status") == "ok" else "down"
-    except Exception:
+    except Exception:  # noqa: BLE001  (health probe — any probe failure = down)
+        log.warning("doctor: bge health probe failed")
         return "down"
 
 def _llama() -> str:

@@ -19,10 +19,11 @@
 """Engine open helper — resolve a project brain DB to (store, engine)."""
 import pathlib
 
-from memeng.store import SQLiteStore
 from memeng.engine import MemoryEngine
+from memeng.store import SQLiteStore
 
-def open_engine(project_dir, brain: str):
+
+def open_engine(project_dir, brain: str) -> tuple[SQLiteStore, MemoryEngine]:
     db = pathlib.Path(project_dir) / ".positronic" / "brains" / brain / "memory.db"
     if not db.exists():
         raise FileNotFoundError(f"no such brain db: {db}")

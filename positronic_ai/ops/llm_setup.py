@@ -17,7 +17,10 @@
 # =====================================================================
 
 """LLM-setup verb — tier guide from docs/llama.md (port of plugin llmSetup.ts)."""
+import logging
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 _DOC = Path(__file__).resolve().parents[2] / "docs" / "llama.md"
 _GUIDE_LEN = 500
@@ -26,6 +29,7 @@ def run(tier="3") -> dict:
     """Return {tier, guide} where guide is the first 500 chars of docs/llama.md."""
     try:
         md = _DOC.read_text("utf-8")
-    except Exception:
+    except Exception:  # noqa: BLE001  (missing doc → fallback text)
+        log.warning("llm-setup: docs/llama.md unreadable")
         md = "see docs/llama.md"
     return {"tier": str(tier), "guide": md[:_GUIDE_LEN]}

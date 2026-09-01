@@ -18,7 +18,7 @@
 
 def test_ingest_writes_event():
     import tempfile
-    from positronic_ai.config import set_key
+
     from positronic_ai.brains import init_brain
     from positronic_ai.ops.ingest import run
     with tempfile.TemporaryDirectory() as d:
@@ -28,8 +28,9 @@ def test_ingest_writes_event():
 
 def test_live_false_skips():
     import tempfile
-    from positronic_ai.config import set_key
+
     from positronic_ai.brains import init_brain
+    from positronic_ai.config import set_key
     from positronic_ai.ops.ingest import run
     with tempfile.TemporaryDirectory() as d:
         init_brain(d, "kairos", "balanced", "lexical")

@@ -55,7 +55,7 @@ def load_config(project_dir) -> dict:
     return data
 
 def _validate(cfg: dict) -> None:
-    for name, b in cfg.get("brains", {}).items():
+    for b in cfg.get("brains", {}).values():
         prof = b.get("profile")
         if prof and prof not in ALLOWED_PROFILES:
             raise ValueError(f"unknown retention profile: {prof}")

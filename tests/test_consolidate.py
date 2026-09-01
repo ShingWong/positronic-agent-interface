@@ -18,6 +18,7 @@
 
 def test_consolidate_summary():
     import tempfile
+
     from positronic_ai.brains import init_brain
     from positronic_ai.ops.consolidate import run
     with tempfile.TemporaryDirectory() as d:
@@ -29,6 +30,7 @@ def test_consolidate_summary():
 
 def test_consolidate_empty():
     import tempfile
+
     from positronic_ai.brains import init_brain
     from positronic_ai.ops.consolidate import run
     with tempfile.TemporaryDirectory() as d:

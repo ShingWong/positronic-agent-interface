@@ -23,10 +23,16 @@ goes through positronic_ai.config. No hardcoded sys.path.
 """
 from pathlib import Path
 
-from memeng.store import SQLiteStore
 from memeng.engine import MemoryEngine
+from memeng.store import SQLiteStore
 
-from .config import ALLOWED_EMBEDS, ALLOWED_PROFILES, ENGRAM_TAG, load_config, save_config
+from .config import (
+    ALLOWED_EMBEDS,
+    ALLOWED_PROFILES,
+    load_config,
+    save_config,
+)
+
 
 def init_brain(project_dir, name: str, profile: str, embed: str = "lexical", threshold=None) -> str:
     """Validate retention_profile, create .positronic/brains/{name}/memory.db and register domain.

@@ -22,11 +22,14 @@ Port of `query --objects` + `--sightings` merged for one object. Scans the
 federated `.positronic/brains/*`; the first brain holding a fuzzy match wins.
 Public-safe: never imports the private kairos_brain.
 """
+import logging
 from pathlib import Path
 
 from ..config import load_config
 from ..engine import open_engine
 from ..objects import object_sightings, resolve_object
+
+log = logging.getLogger(__name__)
 
 
 def run(dir, object_name) -> dict:
@@ -45,6 +48,7 @@ def run(dir, object_name) -> dict:
                 continue
             sightings = object_sightings(s, row["id"])
             return {"object": row, "sightings": sightings, "found": True}
-        except Exception:
+        except Exception:  # noqa: BLE001  (federated skip — one bad brain must not fail the search)
+            log.warning("ask: brain %s skipped — open/fetch failed", name)
             continue
     return {"object": None, "sightings": [], "found": False}

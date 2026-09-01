@@ -17,3 +17,6 @@ positronic = "positronic_ai.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["positronic_ai*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

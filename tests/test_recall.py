@@ -26,6 +26,7 @@ def _seed_two_brains(dir):
 
 def test_recall_alpha_hits_kairos():
     import tempfile
+
     from positronic_ai.ops.recall import run
     with tempfile.TemporaryDirectory() as d:
         _seed_two_brains(d)
@@ -37,6 +38,7 @@ def test_recall_alpha_hits_kairos():
 
 def test_recall_beta_hits_research():
     import tempfile
+
     from positronic_ai.ops.recall import run
     with tempfile.TemporaryDirectory() as d:
         _seed_two_brains(d)
@@ -45,6 +47,7 @@ def test_recall_beta_hits_research():
 
 def test_recall_shared_word_fuses_both_brains():
     import tempfile
+
     from positronic_ai.ops.recall import run
     with tempfile.TemporaryDirectory() as d:
         _seed_two_brains(d)
@@ -56,6 +59,7 @@ def test_recall_shared_word_fuses_both_brains():
 
 def test_recall_brains_filter_and_empty():
     import tempfile
+
     from positronic_ai.ops.recall import run
     with tempfile.TemporaryDirectory() as d:
         _seed_two_brains(d)
@@ -71,6 +75,7 @@ def _seed_ask(dir):
 
 def test_ask_object_dossier():
     import tempfile
+
     from positronic_ai.ops.ask import run
     with tempfile.TemporaryDirectory() as d:
         _seed_ask(d)
@@ -82,6 +87,7 @@ def test_ask_object_dossier():
 
 def test_ask_unknown_object():
     import tempfile
+
     from positronic_ai.ops.ask import run
     with tempfile.TemporaryDirectory() as d:
         _seed_ask(d)
@@ -90,14 +96,15 @@ def test_ask_unknown_object():
 
 def _seed_wake(dir):
     from positronic_ai.brains import init_brain
-    from positronic_ai.ops.ingest import run as ingest
     from positronic_ai.ops.consolidate import run as consolidate
+    from positronic_ai.ops.ingest import run as ingest
     init_brain(dir, "kairos", "balanced", "lexical")
     ingest(dir, "epsilon anchor memory marker persists", arousal=1.0)
     consolidate(dir, "session compacted de9a2c", arousal=0.4)
 
 def test_wake_brief():
     import tempfile
+
     from positronic_ai.ops.wake import run
     with tempfile.TemporaryDirectory() as d:
         _seed_wake(d)
@@ -109,14 +116,15 @@ def test_wake_brief():
 
 def _seed_recall_digest(dir):
     from positronic_ai.brains import init_brain
-    from positronic_ai.ops.ingest import run as ingest
     from positronic_ai.ops.consolidate import run as consolidate
+    from positronic_ai.ops.ingest import run as ingest
     init_brain(dir, "kairos", "balanced", "lexical")
     ingest(dir, "deployed memory.db into the agent interface", arousal=0.5)
     consolidate(dir, "digest: memory.db deploy shipped and verified", arousal=0.4)
 
 def test_recall_matching_cue_returns_polytemporal_digest():
     import tempfile
+
     from positronic_ai.ops.recall import run
     with tempfile.TemporaryDirectory() as d:
         _seed_recall_digest(d)
@@ -132,6 +140,7 @@ def test_recall_matching_cue_returns_polytemporal_digest():
 
 def test_recall_nonmatching_cue_has_no_object_block():
     import tempfile
+
     from positronic_ai.ops.recall import run
     with tempfile.TemporaryDirectory() as d:
         _seed_recall_digest(d)

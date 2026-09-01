@@ -1,15 +1,74 @@
-<!--
-Licensed under the GNU General Public License, version 3 or later (GPL-3.0-or-later).
-Copyright (C) 2026 Shing Wong. All Rights Reserved.
-See LICENSE for the full license text.
--->
+# Positronic-Agent-Interface — the frontal-lobe seam
 
-# positronic-agent-interface (PAI)
+### The polytemporal memory interface your agent actually calls
 
-Polytemporal memory agent interface over `memeng` (positronic-engram). Owns
-`.positronic/config.json` and `.positronic/brains/{name}/memory.db`; exposes
-every operation as a code API (`positronic_ai.*`) and a CLI verb (`positronic`
-/ `python -m positronic_ai`).
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![SQLite Powered](https://img.shields.io/badge/Storage-SQLite-lightgrey)]()
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
+[![Recall](https://img.shields.io/badge/Recall-digest%20%2B%20dossier-brightgreen)]()
+
+`positronic-agent-interface` (PAI) is the seam between an agent and
+[`positronic-engram`](https://github.com/ShingWong/positronic-engram) — the thin Python layer both
+[opencode](https://github.com/ShingWong/positronic-opencode-plugin) and Claude Code plugins call.
+It owns `.positronic/config.json` + `.positronic/brains/{name}/memory.db`, exposes every memory
+operation as a code API (`positronic_ai.*`) and a CLI verb (`positronic` / `python -m positronic_ai`),
+and delegates all memory logic to `memeng`.
+
+Not a memory engine, not a plugin. A **contract**: the plugins never touch `memeng` directly; every
+verb is `run(...) -> dict`, JSON-serializable, ready for a tool call.
+
+---
+
+## Table of Contents
+
+- [Why a separate interface?](#why-a-separate-interface)
+- [The polytemporal contract — recall digest, ask depth](#the-polytemporal-contract--recall-digest-ask-depth)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Verbs](#verbs)
+- [Config keys](#config-keys)
+- [Memory lifecycle: compaction-driven by default](#memory-lifecycle-compaction-driven-by-default)
+- [Federated recall](#federated-recall)
+- [Wire it into your agent (CLAUDE.md / AGENTS.md)](#wire-it-into-your-agent-claudemd--agentsmd)
+- [Ecosystem](#ecosystem)
+- [License](#license)
+
+---
+
+## Why a separate interface?
+
+The memory engine decides what to keep and how to retrieve it. The agent decides what a memory
+*means* in the current context. In between sits a thin, stable seam — PAI — so that:
+
+- **The plugins stay thin.** opencode and Claude Code spawn `python -m positronic_ai <verb>` and
+  return the JSON. All policy, config, and federation live here, not in each plugin.
+- **One interface, two hosts.** opencode slashes (`/positronic:*`), agentic tools
+  (`positronic.*`), and the CLI all dispatch to the same `run(...)` functions.
+- **The frontal lobe is the agent.** PAI preserves polytemporal structure and hands it over; it
+  never pre-judges which memory version answers the query — that's the agent's job.
+
+---
+
+## The polytemporal contract — recall digest, ask depth
+
+The brain stores **polytemporal objects** — one canonical entity, a family of τ-ordered sightings
+(messages *and* consolidations pointing at it). PAI preserves and presents that structure:
+
+- `recall "<cue>"` → live RRF episode hits **plus** an `object` block when the cue fuzzy-matches an
+  object. The block is a **digest**: `{sighting_count, tau_span, latest_consolidation, oldest_tau}` —
+  enough to know depth exists without dumping the data.
+- `ask "<object>"` → the **full τ-ordered dossier** — every sighting with its own `tau`/`wall`/`kind`.
+  This is the dig-deeper verb: read the headline, then decide how far back to go.
+
+```bash
+positronic recall "prune_merge" --json     # digest: 30 sightings, tau span, latest consolidation
+positronic ask "prune_merge" --json        # full dossier, every sighting in τ order
+```
+
+The engine records the family; the agent reasons over it. Same move as opening older commits when
+debugging which version caused a bug.
+
+---
 
 ## Install
 
@@ -17,10 +76,12 @@ every operation as a code API (`positronic_ai.*`) and a CLI verb (`positronic`
 pip install "git+https://github.com/ShingWong/positronic-agent-interface.git"
 ```
 
-This installs the `positronic` console script plus the `positronic_ai` package
-(`memeng` is pulled in at `v0.2.0`).
+This installs the `positronic` console script plus the `positronic_ai` package (`memeng` is pulled
+in at `v0.2.0`).
 
-## Get a brain running in 30 seconds
+---
+
+## Quick start
 
 ```bash
 positronic init --brain demo           # creates .positronic/config.json + brain db
@@ -28,6 +89,8 @@ positronic ingest "first memory here"
 positronic recall "first memory"       # federated recall across all brains
 positronic stats                       # per-brain episode counts
 ```
+
+---
 
 ## Verbs
 
@@ -51,7 +114,11 @@ positronic stats                       # per-brain episode counts
 | `wake` | trigger a consolidation marker + prune sweep |
 | `doctor` | `{ lexical, bge, llama, engram }` tier check |
 
-Every verb works as `positronic <verb>` or `python -m positronic_ai <verb>`.
+Every verb works as `positronic <verb>` or `python -m positronic_ai <verb>`, and returns
+JSON-serializable dicts. Full signature + return contract: `api-spec.md`; design rationale:
+`DESIGN.md`.
+
+---
 
 ## Config keys
 
@@ -66,6 +133,8 @@ Every verb works as `positronic <verb>` or `python -m positronic_ai <verb>`.
   `counters.since_prune` (running tallies), `dedup` (bool, skip exact-repeat
   messages), `capture_user` (bool, ingest user-role messages — off by default
   for privacy).
+
+---
 
 ## Memory lifecycle: compaction-driven by default
 
@@ -111,14 +180,7 @@ Claude Code enables this per-call (`--dedup` on its `UserPromptSubmit` hook)
 because a repeated prompt must not re-ingest itself; opencode leaves it off
 since its `chat.message` capture records distinct turns.
 
-## JSON output
-
-Pass `--json` to any verb for machine-readable output:
-
-```bash
-positronic stats --json
-positronic doctor --json
-```
+---
 
 ## Federated recall
 
@@ -128,6 +190,8 @@ positronic recall "topic"
 
 `recall` fuses hits across every configured brain and returns ranked memories.
 Use `ask` for a natural-language answer over that memory.
+
+---
 
 ## Wire it into your agent (CLAUDE.md / AGENTS.md)
 
@@ -140,33 +204,27 @@ week's decisions and a full re-read of the same files.
 
 **opencode** — add to your project's `AGENTS.md`:
 
-```markdown
-## Dogfooding: recall before resuming (mandatory)
+    ## Dogfooding: recall before resuming (mandatory)
 
-Before resuming work in this repo — a new task, a follow-up edit, or an
-executing-plans session — run the brain first to ground in prior decisions:
+    Before resuming work in this repo — a new task, a follow-up edit, or an
+    executing-plans session — run the brain first to ground in prior decisions:
 
-```bash
-positronic recall "<topic>" --json     # or python -m positronic_ai recall ...
-```
+        positronic recall "<topic>" --json     # or python -m positronic_ai recall ...
 
-Retrieval is fast (single-digit ms) and surfaces the session decisions live
-ingestion already captured, saving the re-read. This rule binds the main
-agent and every subagent: query/recall before you re-derive.
-```
+    Retrieval is fast (single-digit ms) and surfaces the session decisions live
+    ingestion already captured, saving the re-read. This rule binds the main
+    agent and every subagent: query/recall before you re-derive.
 
 **Claude Code** — add the same rule to your project's `CLAUDE.md` (or rely on
 the `memory` skill bundled with the claude-code plugin, which teaches the
 model to run `recall`/`query`/`ask` when it needs prior context):
 
-```markdown
-## Memory
+    ## Memory
 
-This project has a polytemporal memory brain (`.positronic/`). Before
-answering about prior work, decisions, or history, run
-`python -m positronic_ai recall "<topic>" --json` and use the results.
-Don't guess from scratch — recall is milliseconds.
-```
+    This project has a polytemporal memory brain (`.positronic/`). Before
+    answering about prior work, decisions, or history, run
+    `python -m positronic_ai recall "<topic>" --json` and use the results.
+    Don't guess from scratch — recall is milliseconds.
 
 Key points to convey:
 
@@ -179,6 +237,21 @@ Key points to convey:
   decisions"). The umbrella `AGENTS.md` in the positronic monorepo is a
   working example of all of the above.
 
+---
+
+## Ecosystem
+
+- **[positronic-engram](https://github.com/ShingWong/positronic-engram)** — the polytemporal memory engine (`memeng`) this interface delegates to; pinned by `ENGRAM_TAG`.
+- **[positronic-opencode-plugin](https://github.com/ShingWong/positronic-opencode-plugin)** — the opencode plugin; a thin adapter that spawns `python -m positronic_ai <verb>`.
+- **[positronic-claude-code-plugin](https://github.com/ShingWong?tab=repositories)** — the Claude Code plugin; same adapter pattern with `PreCompact` lifecycle hooks.
+- **[positronic-research](https://github.com/ShingWong?tab=repositories)** — the paper and benchmark harness behind the engine.
+- **This interface** — `positronic_ai/` (`cli.py`, `config.py`, `engine.py`, `objects.py`, `ops/*.py`).
+
+The plugins never touch `memeng` directly — they route into this interface. That keeps the engine
+portable and the plugin surface honest.
+
+---
+
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE).
+GPL-3.0-or-later — see `LICENSE`.

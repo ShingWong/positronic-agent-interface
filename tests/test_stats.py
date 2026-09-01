@@ -25,6 +25,7 @@ def _seed(dir, n=3):
 
 def test_stats_counts_episodes():
     import tempfile
+
     from positronic_ai.ops.stats import run
     with tempfile.TemporaryDirectory() as d:
         _seed(d, 3)
@@ -36,6 +37,7 @@ def test_stats_counts_episodes():
 
 def test_stats_brain_filter():
     import tempfile
+
     from positronic_ai.ops.stats import run
     with tempfile.TemporaryDirectory() as d:
         _seed(d, 1)
@@ -44,6 +46,7 @@ def test_stats_brain_filter():
 
 def test_stats_missing_db_skipped():
     import tempfile
+
     from positronic_ai.config import save_config
     from positronic_ai.ops.stats import run
     with tempfile.TemporaryDirectory() as d:

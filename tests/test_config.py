@@ -17,29 +17,36 @@
 # =====================================================================
 
 def test_defaults():
+    import tempfile
+
     from positronic_ai.config import load_config
-    import tempfile, pathlib
     with tempfile.TemporaryDirectory() as d:
         cfg = load_config(d)
         assert cfg["live"] is True and cfg["engram_tag"] == "v0.2.0"
 
 def test_set_live_roundtrip():
-    from positronic_ai.config import set_key, load_config
     import tempfile
+
+    from positronic_ai.config import load_config, set_key
     with tempfile.TemporaryDirectory() as d:
         set_key(d, "live", False)
         assert load_config(d)["live"] is False
 
 def test_unknown_key_rejected():
+    import tempfile
+
+    import pytest
+
     from positronic_ai.config import set_key
-    import tempfile, pytest
-    with tempfile.TemporaryDirectory() as d:
-        with pytest.raises(ValueError):
-            set_key(d, "nope", 1)
+    with tempfile.TemporaryDirectory() as d, pytest.raises(ValueError):
+        set_key(d, "nope", 1)
 
 def test_bad_profile_rejected():
+    import tempfile
+
+    import pytest
+
     from positronic_ai.config import set_key
-    import tempfile, pytest
     with tempfile.TemporaryDirectory() as d:
         set_key(d, "profile", "balanced", brain="kairos") if False else None  # no brain yet
         with pytest.raises(ValueError):

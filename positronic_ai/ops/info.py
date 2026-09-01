@@ -17,15 +17,21 @@
 # =====================================================================
 
 """Info verb — version, ENGRAM_TAG, brains, tiers (port of plugin info.ts)."""
+import logging
+
 from .. import __version__
 from ..config import ENGRAM_TAG, load_config
 from . import doctor
+
+log = logging.getLogger(__name__)
+
 
 def run(dir) -> dict:
     """Return {version, engram_tag, brains, tiers} for the project dir."""
     try:
         cfg = load_config(dir)
-    except Exception:
+    except Exception:  # noqa: BLE001  (config absent → defaults)
+        log.warning("info: config unreadable — defaults used")
         cfg = {"brains": {}, "engram_tag": ENGRAM_TAG}
     doc = doctor.run()
     return {

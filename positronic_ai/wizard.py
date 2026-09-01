@@ -17,10 +17,13 @@
 # =====================================================================
 
 """Init wizard — help text + config merge (port of plugin wizard.ts)."""
+import logging
 from pathlib import Path
 
 from .brains import init_brain
 from .config import ENGRAM_TAG, load_config, save_config
+
+log = logging.getLogger(__name__)
 
 HELP = """Pick how your brain remembers:
 
@@ -99,7 +102,8 @@ def init_run(dir, *, brains=None, force=False, live=None,
 
     try:
         existing_cfg = load_config(dir)
-    except Exception:
+    except Exception:  # noqa: BLE001  (config absent → fresh init)
+        log.warning("init: config unreadable — starting fresh")
         existing_cfg = {}
     live_val = live if live is not None else existing_cfg.get("live", True)
     prev_auto = existing_cfg.get("auto") or {}

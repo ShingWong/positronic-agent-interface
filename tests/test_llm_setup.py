@@ -18,6 +18,7 @@
 
 def test_llm_setup_guide_default():
     from pathlib import Path
+
     from positronic_ai.ops.llm_setup import run
     doc = Path(__file__).resolve().parents[1] / "docs" / "llama.md"
     out = run()

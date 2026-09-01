@@ -50,7 +50,7 @@ _VALUE_FLAGS = {"brain", "k", "sql", "cue", "text", "arousal", "tier",
                 "auto-consolidate", "auto-prune", "role"}
 
 
-def _parse(argv):
+def _parse(argv) -> tuple[list[str], dict]:
     args, flags = [], {}
     i, n = 0, len(argv)
     while i < n:
@@ -84,36 +84,36 @@ def _parse(argv):
     return args, flags
 
 
-def _brain(flags):
+def _brain(flags: dict) -> str | None:
     names = flags.get("brain") or []
     return names[-1] if names else None
 
 
-def _flag(flags, name):
+def _flag(flags: dict, name: str) -> bool:
     v = flags.get(name)
     if isinstance(v, str):
         return v.lower() not in ("false", "0", "no", "off", "")
     return bool(v)
 
 
-def _int(flags, name, default=None):
+def _int(flags: dict, name: str, default=None) -> int | None:
     v = flags.get(name)
     return default if v in (None, True, False) else int(v)
 
 
-def _float(flags, name, default=None):
+def _float(flags: dict, name: str, default=None) -> float | None:
     v = flags.get(name)
     return default if v in (None, True, False) else float(v)
 
 
-def _text(args, flags):
+def _text(args: list[str], flags: dict) -> str | None:
     t = flags.get("text")
     if t not in (None, True, False):
         return t
     return " ".join(args) or None
 
 
-def _run(verb, dir, args, flags):
+def _run(verb, dir, args, flags) -> dict:
     if verb == "init":
         names = flags.get("brain") or []
         profile = flags.get("profile") or "balanced"
@@ -186,7 +186,7 @@ def _run(verb, dir, args, flags):
     raise ValueError(f"unhandled verb {verb}")
 
 
-def _emit(out, use_json):
+def _emit(out, use_json: bool) -> None:
     if use_json:
         print(json.dumps(out, indent=2, default=str))
     elif isinstance(out, dict) and isinstance(out.get("human"), str):
@@ -207,7 +207,7 @@ def main(argv=None) -> int:
     args, flags = _parse(argv[1:])
     try:
         out = _run(verb, os.getcwd(), args, flags)
-    except Exception as ex:
+    except Exception as ex:  # noqa: BLE001  (CLI boundary — any verb error surfaces as exit 1)
         print(f"{verb}: {ex}", file=sys.stderr)
         return 1
     _emit(out, bool(flags.get("json")))

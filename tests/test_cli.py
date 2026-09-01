@@ -40,7 +40,7 @@ def _env():
 
 def _run(dir_, *args):
     return subprocess.run([PY, "-m", "positronic_ai", *args], cwd=str(dir_),
-                          env=_env(), capture_output=True, text=True)
+                          env=_env(), capture_output=True, text=True, check=False)
 
 
 def test_cli_init_creates_brain(tmp_path):
