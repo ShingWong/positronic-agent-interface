@@ -1,0 +1,36 @@
+# =====================================================================
+# Project Positronic — Polytemporal Cognitive Engram Memory Substrate
+# Copyright (C) 2026 Shing Wong. All Rights Reserved.
+# =====================================================================
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://gnu.org>.
+# =====================================================================
+
+"""Info verb — version, ENGRAM_TAG, brains, tiers (port of plugin info.ts)."""
+from .. import __version__
+from ..config import ENGRAM_TAG, load_config
+from . import doctor
+
+def run(dir) -> dict:
+    """Return {version, engram_tag, brains, tiers} for the project dir."""
+    try:
+        cfg = load_config(dir)
+    except Exception:
+        cfg = {"brains": {}, "engram_tag": ENGRAM_TAG}
+    doc = doctor.run()
+    return {
+        "version": __version__,
+        "engram_tag": cfg.get("engram_tag", ENGRAM_TAG),
+        "brains": cfg.get("brains", {}),
+        "tiers": doc.get("tiers", doc),
+    }
