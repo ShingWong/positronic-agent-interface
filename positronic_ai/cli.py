@@ -83,8 +83,16 @@ def _parse(argv):
     return args, flags
 
 
+def _brain(flags):
+    names = flags.get("brain") or []
+    return names[-1] if names else None
+
+
 def _flag(flags, name):
-    return bool(flags.get(name))
+    v = flags.get(name)
+    if isinstance(v, str):
+        return v.lower() not in ("false", "0", "no", "off", "")
+    return bool(v)
 
 
 def _int(flags, name, default=None):
@@ -111,8 +119,8 @@ def _run(verb, dir, args, flags):
         embed = flags.get("embed") or "lexical"
         brains = [{"name": n, "profile": profile, "embed": embed} for n in names]
         live = None
-        if _flag(flags, "live"):
-            live = True
+        if "live" in flags:
+            live = _flag(flags, "live")
         elif _flag(flags, "no-live"):
             live = False
         return OPS["init"](dir, brains=brains, force=_flag(flags, "force"),
@@ -122,16 +130,16 @@ def _run(verb, dir, args, flags):
     if verb == "wake":
         return OPS["wake"](dir)
     if verb == "stats":
-        return OPS["stats"](dir, brain=flags.get("brain"))
+        return OPS["stats"](dir, brain=_brain(flags))
     if verb == "config":
         key = flags.get("key") or (args[0] if args else None)
         value = flags.get("value")
         if value is None and len(args) > 1:
             value = args[1]
-        return OPS["config"](dir, key=key, value=value, brain=flags.get("brain"),
+        return OPS["config"](dir, key=key, value=value, brain=_brain(flags),
                              show_secrets=_flag(flags, "show-secrets"))
     if verb == "brain-test":
-        return OPS["brain-test"](dir, brain=flags.get("brain") or "kairos",
+        return OPS["brain-test"](dir, brain=_brain(flags) or "kairos",
                                  k=_int(flags, "k", 3))
     if verb == "llm-stat":
         return OPS["llm-stat"]()
@@ -143,22 +151,22 @@ def _run(verb, dir, args, flags):
                              status=flags.get("status"),
                              tail=_int(flags, "tail"), dir=dir)
     if verb == "delete":
-        return OPS["delete"](dir, brain=flags.get("brain"),
+        return OPS["delete"](dir, brain=_brain(flags),
                              force=_flag(flags, "force"))
     if verb == "query":
-        return OPS["query"](dir, brain=flags.get("brain"), text=_text(args, flags),
+        return OPS["query"](dir, brain=_brain(flags), text=_text(args, flags),
                             sql=flags.get("sql"), cue=flags.get("cue"),
                             objects=_flag(flags, "objects"),
                             anchors=_flag(flags, "anchors"),
                             sightings=_flag(flags, "sightings"),
                             k=_int(flags, "k", 8))
     if verb == "prune":
-        return OPS["prune"](dir, brain=flags.get("brain"))
+        return OPS["prune"](dir, brain=_brain(flags))
     if verb == "consolidate":
-        return OPS["consolidate"](dir, _text(args, flags), brain=flags.get("brain"),
+        return OPS["consolidate"](dir, _text(args, flags), brain=_brain(flags),
                                   arousal=_float(flags, "arousal", 0.4))
     if verb == "ingest":
-        return OPS["ingest"](dir, _text(args, flags), brain=flags.get("brain"),
+        return OPS["ingest"](dir, _text(args, flags), brain=_brain(flags),
                              arousal=_float(flags, "arousal", 0.5))
     if verb == "recall":
         return OPS["recall"](dir, _text(args, flags), k=_int(flags, "k", 8))

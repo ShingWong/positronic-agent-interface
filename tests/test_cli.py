@@ -70,6 +70,34 @@ def test_cli_config_live_true_regression(tmp_path):
     assert cfg["live"] is True
 
 
+def test_cli_stats_scalar_brain(tmp_path):
+    r = _run(tmp_path, "init", "--brain", "kairos", "--profile", "balanced",
+             "--embed", "lexical")
+    assert r.returncode == 0, r.stderr
+    r = _run(tmp_path, "stats", "--brain", "kairos", "--json")
+    assert r.returncode == 0, r.stderr
+    data = json.loads(r.stdout)
+    assert "kairos" in data["brains"]
+
+
+def test_cli_config_scalar_brain(tmp_path):
+    r = _run(tmp_path, "init", "--brain", "kairos", "--profile", "balanced",
+             "--embed", "lexical")
+    assert r.returncode == 0, r.stderr
+    r = _run(tmp_path, "config", "live", "true", "--json")
+    assert r.returncode == 0, r.stderr
+    r = _run(tmp_path, "config", "profile", "balanced", "--brain", "kairos",
+             "--json")
+    assert r.returncode == 0, r.stderr
+
+
+def test_cli_false_flag_respected(tmp_path):
+    r = _run(tmp_path, "init", "--brain", "kairos", "--live=false")
+    assert r.returncode == 0, r.stderr
+    cfg = json.loads((tmp_path / ".positronic" / "config.json").read_text())
+    assert cfg["live"] is False
+
+
 def test_cli_unknown_verb_usage_on_stderr(tmp_path):
     r = _run(tmp_path, "badverb")
     assert r.returncode == 1
