@@ -47,7 +47,7 @@ USAGE = "positronic <verb> [args]\nverbs: " + " | ".join(OPS)
 
 _VALUE_FLAGS = {"brain", "k", "sql", "cue", "text", "arousal", "tier",
                 "status", "tail", "pin", "value", "key", "profile", "embed",
-                "auto-consolidate", "auto-prune"}
+                "auto-consolidate", "auto-prune", "role"}
 
 
 def _parse(argv):
@@ -170,9 +170,13 @@ def _run(verb, dir, args, flags):
         return OPS["consolidate"](dir, _text(args, flags), brain=_brain(flags),
                                   arousal=_float(flags, "arousal", 0.4))
     if verb == "ingest":
+        role = flags.get("role")
+        if role in (None, True, False):
+            role = "assistant"
         return OPS["ingest"](dir, _text(args, flags), brain=_brain(flags),
                              arousal=_float(flags, "arousal", 0.5),
-                             dedup=(_flag(flags, "dedup") if "dedup" in flags else None))
+                             dedup=(_flag(flags, "dedup") if "dedup" in flags else None),
+                             role=role)
     if verb == "recall":
         return OPS["recall"](dir, _text(args, flags), k=_int(flags, "k", 8))
     if verb == "ask":

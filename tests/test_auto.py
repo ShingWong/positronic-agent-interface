@@ -124,3 +124,36 @@ def test_init_sets_auto_flags():
         assert r.returncode == 0, r.stderr
         cfg = load_config(d)
         assert cfg["auto"] == {"consolidate_every": 25, "prune_every": 500}
+
+def test_ingest_role_tagged():
+    with tempfile.TemporaryDirectory() as d:
+        _seed(d)
+        ingest(d, "a user question", role="user")
+        ingest(d, "an assistant answer", role="assistant")
+        rows = query(d, sql="SELECT json_extract(features_json,'$.role') r FROM episode WHERE kind='message' ORDER BY tau")
+        roles = [r["r"] for r in rows["results"]]
+        assert roles == ["user", "assistant"]
+
+
+def test_dedup_scoped_by_role():
+    with tempfile.TemporaryDirectory() as d:
+        _seed(d)
+        set_key(d, "dedup", True)
+        ingest(d, "same text", role="user")
+        ingest(d, "same text", role="assistant")
+        dup = ingest(d, "same text", role="user")
+        assert dup["duplicate"] is True
+        rows = query(d, sql="SELECT COUNT(*) c FROM episode WHERE kind='message'")
+        assert rows["results"][0]["c"] == 2
+
+
+def test_capture_user_default_off():
+    with tempfile.TemporaryDirectory() as d:
+        cfg = load_config(d)
+        assert cfg["capture_user"] is False
+
+
+def test_set_capture_user():
+    with tempfile.TemporaryDirectory() as d:
+        set_key(d, "capture_user", True)
+        assert load_config(d)["capture_user"] is True

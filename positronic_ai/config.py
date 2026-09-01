@@ -26,12 +26,12 @@ ENGRAM_TAG = "v0.2.0"
 CONFIG_KEYS = {"profile", "embed", "threshold", "live",
                "local_url", "remote_url", "remote_key", "engram_tag",
                "consolidate_every", "prune_every", "dedup",
-               "since_consolidate", "since_prune"}
+               "since_consolidate", "since_prune", "capture_user"}
 _DEFAULT = {"brains": {}, "live": True,
             "embed": {"local_url": "http://127.0.0.1:8090"}, "engram_tag": ENGRAM_TAG,
             "auto": {"consolidate_every": 0, "prune_every": 0},
             "counters": {"since_consolidate": 0, "since_prune": 0},
-            "dedup": False}
+            "dedup": False, "capture_user": False}
 
 def _config_path(project_dir) -> Path:
     return Path(project_dir) / ".positronic" / "config.json"
@@ -78,6 +78,9 @@ def _validate(cfg: dict) -> None:
     dedup = cfg.get("dedup")
     if dedup is not None and not isinstance(dedup, bool):
         raise ValueError("dedup must be a boolean")
+    capture_user = cfg.get("capture_user")
+    if capture_user is not None and not isinstance(capture_user, bool):
+        raise ValueError("capture_user must be a boolean")
 
 def save_config(project_dir, cfg: dict) -> None:
     _validate(cfg)
@@ -119,6 +122,8 @@ def set_key(project_dir, key: str, value, *, brain: str | None = None) -> dict:
         cfg.setdefault("auto", {})[key] = int(value)
     elif key == "dedup":
         cfg["dedup"] = bool(value)
+    elif key == "capture_user":
+        cfg["capture_user"] = bool(value)
     elif key in ("since_consolidate", "since_prune"):
         cfg.setdefault("counters", {})[key] = int(value)
     else:

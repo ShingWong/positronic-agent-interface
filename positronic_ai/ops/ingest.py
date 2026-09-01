@@ -26,7 +26,7 @@ from ..config import load_config, save_config
 from ..engine import open_engine
 
 def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
-        dedup=None) -> dict:
+        dedup=None, role="assistant") -> dict:
     cfg = load_config(dir)
     if cfg.get("live") is False and kind == "message":
         return {"encoded": False, "reason": "live=false"}
@@ -39,7 +39,8 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
     if kind == "message" and dedup_eff:
         row = s.conn.execute(
             "SELECT features_json FROM episode WHERE kind='message' "
-            "ORDER BY tau DESC LIMIT 1").fetchone()
+            "AND json_extract(features_json,'$.role') = ? "
+            "ORDER BY tau DESC LIMIT 1", (role,)).fetchone()
         if row is not None:
             last = json.loads(row["features_json"]).get("body_text")
             if last == text:
@@ -48,7 +49,8 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
     subj = subject or text[:80]
     r = e.new_event(Event(stream=f"positronic:{name}", kind=kind,
                           persons=["p_kairos"], wall=datetime.now(timezone.utc),
-                          features={"subject_norm": subj, "body_text": text, "arousal": arousal}))
+                          features={"subject_norm": subj, "body_text": text,
+                                    "arousal": arousal, "role": role}))
     out = {"tau": r.tau, "encoded": bool(r.verdict.encoded), "episode_id": str(r.episode_id)}
     if kind == "message":
         _advance_counters(dir, name)

@@ -64,7 +64,8 @@ Every verb works as `positronic <verb>` or `python -m positronic_ai <verb>`.
 - Lifecycle: `auto.consolidate_every`, `auto.prune_every` (episode counts,
   `0` = disabled — the default), `counters.since_consolidate`,
   `counters.since_prune` (running tallies), `dedup` (bool, skip exact-repeat
-  messages).
+  messages), `capture_user` (bool, ingest user-role messages — off by default
+  for privacy).
 
 ## Memory lifecycle: compaction-driven by default
 
