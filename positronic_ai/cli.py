@@ -137,6 +137,7 @@ def _run(verb, dir, args, flags):
         if value is None and len(args) > 1:
             value = args[1]
         return OPS["config"](dir, key=key, value=value, brain=_brain(flags),
+                             confirm=_flag(flags, "confirm"),
                              show_secrets=_flag(flags, "show-secrets"))
     if verb == "brain-test":
         return OPS["brain-test"](dir, brain=_brain(flags) or "kairos",

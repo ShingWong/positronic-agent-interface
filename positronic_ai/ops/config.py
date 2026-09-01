@@ -39,12 +39,15 @@ def _mask(cfg: dict, show_secrets: bool) -> None:
             _mask(item, show_secrets)
 
 
-def run(dir, *, key=None, value=None, brain=None, show_secrets=False) -> dict:
+def run(dir, *, key=None, value=None, brain=None, confirm=False,
+        show_secrets=False) -> dict:
     """Get (no key) or set one config key; returns a dict.
 
     Get mode deep-copies the config and masks remote_key unless
-    show_secrets. Set mode blocks PII paths, coerces live booleans, then
-    delegates to config.set_key returning {changed, before, after}.
+    show_secrets. Set mode blocks PII paths, gates profile=archival on
+    confirm, coerces live booleans, then delegates to config.set_key
+    returning {changed, before, after} (before/after masked unless
+    show_secrets).
     """
     if key is None:
         cfg = json.loads(json.dumps(load_config(dir)))
@@ -54,4 +57,12 @@ def run(dir, *, key=None, value=None, brain=None, show_secrets=False) -> dict:
         raise ValueError("PII path blocked")
     if key == "live" and isinstance(value, str):
         value = value.strip().lower() in _TRUE
-    return set_key(dir, key, value, brain=brain)
+    if key == "profile" and value == "archival" and not confirm:
+        before = json.loads(json.dumps(load_config(dir)))
+        _mask(before, bool(show_secrets))
+        return {"warning": "Retention archival never forgets — E7 55/55/35/7 vs balanced. Re-invoke with confirm:true",
+                "before": before}
+    out = set_key(dir, key, value, brain=brain)
+    _mask(out["before"], bool(show_secrets))
+    _mask(out["after"], bool(show_secrets))
+    return out

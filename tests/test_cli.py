@@ -129,3 +129,66 @@ def test_ops_config_set_returns_changed(tmp_path):
     out = config_run(tmp_path, key="live", value="false")
     assert out["changed"] == ["live"]
     assert out["after"]["live"] is False
+
+
+def test_cli_config_archival_requires_confirm(tmp_path):
+    r = _run(tmp_path, "init", "--brain", "kairos", "--profile", "balanced",
+             "--embed", "lexical")
+    assert r.returncode == 0, r.stderr
+    r = _run(tmp_path, "config", "profile", "archival", "--brain", "kairos",
+             "--json")
+    assert r.returncode == 0, r.stderr
+    data = json.loads(r.stdout)
+    assert "warning" in data
+    assert "confirm:true" in data["warning"]
+    cfg = json.loads((tmp_path / ".positronic" / "config.json").read_text())
+    assert cfg["brains"]["kairos"]["profile"] == "balanced"
+
+
+def test_cli_config_archival_with_confirm_writes(tmp_path):
+    r = _run(tmp_path, "init", "--brain", "kairos", "--profile", "balanced",
+             "--embed", "lexical")
+    assert r.returncode == 0, r.stderr
+    r = _run(tmp_path, "config", "profile", "archival", "--brain", "kairos",
+             "--confirm", "--json")
+    assert r.returncode == 0, r.stderr
+    data = json.loads(r.stdout)
+    assert "warning" not in data
+    cfg = json.loads((tmp_path / ".positronic" / "config.json").read_text())
+    assert cfg["brains"]["kairos"]["profile"] == "archival"
+
+
+def test_ops_config_set_masks_remote_key_in_response(tmp_path):
+    from positronic_ai.ops.config import run as config_run
+    out = config_run(tmp_path, key="remote_key", value="secret123")
+    assert "secret123" not in json.dumps(out)
+    assert out["after"]["embed"]["remote_key"] == "***"
+
+
+def test_ops_config_set_show_secrets_reveals(tmp_path):
+    from positronic_ai.ops.config import run as config_run
+    out = config_run(tmp_path, key="remote_key", value="secret123",
+                     show_secrets=True)
+    assert out["after"]["embed"]["remote_key"] == "secret123"
+
+
+def test_cli_config_set_masks_remote_key(tmp_path):
+    r = _run(tmp_path, "init", "--brain", "kairos", "--profile", "balanced",
+             "--embed", "lexical")
+    assert r.returncode == 0, r.stderr
+    r = _run(tmp_path, "config", "remote_key", "secret123", "--json")
+    assert r.returncode == 0, r.stderr
+    data = json.loads(r.stdout)
+    assert "secret123" not in json.dumps(data)
+    assert data["after"]["embed"]["remote_key"] == "***"
+
+
+def test_cli_config_set_show_secrets_reveals(tmp_path):
+    r = _run(tmp_path, "init", "--brain", "kairos", "--profile", "balanced",
+             "--embed", "lexical")
+    assert r.returncode == 0, r.stderr
+    r = _run(tmp_path, "config", "remote_key", "secret123", "--show-secrets",
+             "--json")
+    assert r.returncode == 0, r.stderr
+    data = json.loads(r.stdout)
+    assert "secret123" in json.dumps(data)
