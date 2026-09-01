@@ -58,6 +58,29 @@ def test_recall_consolidation_mode():
         assert "message" in kinds_d
 
 
+def test_recall_context_window_expands_snippet():
+    import tempfile
+
+    from positronic_ai.brains import init_brain
+    from positronic_ai.ops.ingest import run as ingest
+    from positronic_ai.ops.recall import run
+    with tempfile.TemporaryDirectory() as d:
+        init_brain(d, "kairos", "balanced", "lexical")
+        ingest(d, "premise: redeemed a coupon on coffee creamer",
+               brain="kairos", arousal=0.5)
+        ingest(d, "answer: the coupon was redeemed at Target",
+               brain="kairos", arousal=0.5)
+        # default: premise snippet alone lacks the answer detail
+        out = run(d, "coupon")
+        prem = next(h for h in out["results"] if "premise" in (h["snippet"] or ""))
+        assert "Target" not in (prem["snippet"] or "")
+        # context=1: answer joins the window
+        out2 = run(d, "coupon", context_window=1)
+        prem2 = next(h for h in out2["results"]
+                     if "premise" in (h["snippet"] or ""))
+        assert "Target" in (prem2["snippet"] or "")
+
+
 def test_recall_beta_hits_research():
     import tempfile
 

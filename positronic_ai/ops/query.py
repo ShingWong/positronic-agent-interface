@@ -61,7 +61,7 @@ def _human(parsed) -> str:
 
 def run(dir, *, brain=None, text=None, sql=None, cue=None,
         objects=False, anchors=False, sightings=False, k=8,
-        consolidation=None) -> dict:
+        consolidation=None, context_window=0) -> dict:
     brain = brain or "kairos"
     k = k or 8
     try:
@@ -79,7 +79,8 @@ def run(dir, *, brain=None, text=None, sql=None, cue=None,
     elif objects:
         rows = [dict(r) for r in s.conn.execute(_OBJECTS_SQL.format(k)).fetchall()]
     elif cue:
-        rows = e.activate({"text": cue}, k=k, consolidation=consolidation)
+        rows = e.activate({"text": cue}, k=k, consolidation=consolidation,
+                                context_window=context_window)
     else:
         qtext = (text or "").strip()
         if not qtext:
@@ -89,7 +90,8 @@ def run(dir, *, brain=None, text=None, sql=None, cue=None,
                               "--sightings [--brain kairos] [--k 8] "
                               "[--consolidation only|first]")}
         t0 = time.perf_counter()
-        hits = e.activate({"text": qtext}, k=k, consolidation=consolidation)
+        hits = e.activate({"text": qtext}, k=k, consolidation=consolidation,
+                                context_window=context_window)
         ms = (time.perf_counter() - t0) * 1000
         out = {"ok": True, "brain": brain, "ms": _round(ms, 2),
                "hits": len(hits), "results": hits}

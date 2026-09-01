@@ -32,13 +32,16 @@ from ..objects import object_digest, resolve_object
 log = logging.getLogger(__name__)
 
 
-def run(dir, text, *, k=8, brains=None, consolidation=None) -> dict:
+def run(dir, text, *, k=8, brains=None, consolidation=None,
+        context_window=0) -> dict:
     """Fuse per-brain activate hits; {results: [...], object?: {versions}}.
 
     When the cue fuzzy-matches an object, a compact polytemporal digest
     (versions) is attached — the agent decides how deep to dig (ask reveals
     the full τ-ordered dossier). consolidation passes an activate view mode:
-    None (default), 'only', or 'first' (see memeng.activate).
+    None (default), 'only', or 'first' (see memeng.activate). context_window=N
+    expands each hit's snippet to the ±N τ-adjacent stream neighbors
+    (reunites premise+answer split by per-message chunking).
     """
     text = (text or "").strip()
     if not text:
@@ -58,7 +61,8 @@ def run(dir, text, *, k=8, brains=None, consolidation=None) -> dict:
         try:
             _s, e = open_engine(dir, name)
             hits = e.activate({"text": text}, k=k,
-                              consolidation=consolidation)
+                              consolidation=consolidation,
+                              context_window=context_window)
         except Exception:  # noqa: BLE001  (federated skip — one bad brain must not fail recall)
             log.warning("recall: brain %s skipped — open/activate failed", name)
             continue

@@ -47,7 +47,8 @@ USAGE = "positronic <verb> [args]\nverbs: " + " | ".join(OPS)
 
 _VALUE_FLAGS = {"brain", "k", "sql", "cue", "text", "arousal", "tier",
                 "status", "tail", "pin", "value", "key", "profile", "embed",
-                "auto-consolidate", "auto-prune", "role", "consolidation"}
+                "auto-consolidate", "auto-prune", "role", "consolidation",
+                "context"}
 
 
 def _parse(argv) -> tuple[list[str], dict]:
@@ -167,7 +168,8 @@ def _run(verb, dir, args, flags) -> dict:
                             objects=_flag(flags, "objects"),
                             anchors=_flag(flags, "anchors"),
                             sightings=_flag(flags, "sightings"),
-                            k=_int(flags, "k", 8), consolidation=cons)
+                            k=_int(flags, "k", 8), consolidation=cons,
+                            context_window=_int(flags, "context", 0))
     if verb == "prune":
         return OPS["prune"](dir, brain=_brain(flags))
     if verb == "consolidate":
@@ -187,7 +189,8 @@ def _run(verb, dir, args, flags) -> dict:
             raise ValueError(
                 f"consolidation must be 'only' or 'first', got {cons!r}")
         return OPS["recall"](dir, _text(args, flags), k=_int(flags, "k", 8),
-                             consolidation=cons)
+                             consolidation=cons,
+                             context_window=_int(flags, "context", 0))
     if verb == "ask":
         return OPS["ask"](dir, " ".join(args) or flags.get("text") or "")
     if verb == "doctor":
