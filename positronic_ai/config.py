@@ -24,20 +24,33 @@ ALLOWED_PROFILES = {"balanced", "archival", "long_term", "short_term"}
 ALLOWED_EMBEDS = {"lexical", "local", "remote"}
 ENGRAM_TAG = "v0.2.0"
 CONFIG_KEYS = {"profile", "embed", "threshold", "live",
-               "local_url", "remote_url", "remote_key", "engram_tag"}
+               "local_url", "remote_url", "remote_key", "engram_tag",
+               "consolidate_every", "prune_every", "dedup",
+               "since_consolidate", "since_prune"}
 _DEFAULT = {"brains": {}, "live": True,
-            "embed": {"local_url": "http://127.0.0.1:8090"}, "engram_tag": ENGRAM_TAG}
+            "embed": {"local_url": "http://127.0.0.1:8090"}, "engram_tag": ENGRAM_TAG,
+            "auto": {"consolidate_every": 300, "prune_every": 1000},
+            "counters": {"since_consolidate": 0, "since_prune": 0},
+            "dedup": False}
 
 def _config_path(project_dir) -> Path:
     return Path(project_dir) / ".positronic" / "config.json"
+
+def _merge_defaults(cfg: dict) -> dict:
+    for k, v in _DEFAULT.items():
+        if k not in cfg:
+            cfg[k] = json.loads(json.dumps(v))
+        elif isinstance(v, dict) and isinstance(cfg[k], dict):
+            for kk, vv in v.items():
+                cfg[k].setdefault(kk, json.loads(json.dumps(vv)))
+    return cfg
 
 def load_config(project_dir) -> dict:
     p = _config_path(project_dir)
     if not p.exists():
         return json.loads(json.dumps(_DEFAULT))
     data = json.loads(p.read_text())
-    for k, v in _DEFAULT.items():
-        data.setdefault(k, v)
+    _merge_defaults(data)
     _validate(data)
     return data
 
@@ -52,11 +65,23 @@ def _validate(cfg: dict) -> None:
     live = cfg.get("live")
     if live is not None and not isinstance(live, bool):
         raise ValueError("live must be a boolean")
+    auto = cfg.get("auto") or {}
+    for k in ("consolidate_every", "prune_every"):
+        v = auto.get(k, 0)
+        if not isinstance(v, int) or isinstance(v, bool) or v < 0:
+            raise ValueError(f"auto.{k} must be a non-negative integer")
+    counters = cfg.get("counters") or {}
+    for k in ("since_consolidate", "since_prune"):
+        v = counters.get(k, 0)
+        if not isinstance(v, int) or isinstance(v, bool) or v < 0:
+            raise ValueError(f"counters.{k} must be a non-negative integer")
+    dedup = cfg.get("dedup")
+    if dedup is not None and not isinstance(dedup, bool):
+        raise ValueError("dedup must be a boolean")
 
 def save_config(project_dir, cfg: dict) -> None:
     _validate(cfg)
-    for k, v in _DEFAULT.items():
-        cfg.setdefault(k, v)
+    _merge_defaults(cfg)
     p = _config_path(project_dir)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(cfg, indent=2))
@@ -90,6 +115,12 @@ def set_key(project_dir, key: str, value, *, brain: str | None = None) -> dict:
         cfg.setdefault("embed", {})["remote_key"] = value
     elif key == "engram_tag":
         cfg["engram_tag"] = value
+    elif key in ("consolidate_every", "prune_every"):
+        cfg.setdefault("auto", {})[key] = int(value)
+    elif key == "dedup":
+        cfg["dedup"] = bool(value)
+    elif key in ("since_consolidate", "since_prune"):
+        cfg.setdefault("counters", {})[key] = int(value)
     else:
         raise ValueError(f"unknown key {key}")
     save_config(project_dir, cfg)

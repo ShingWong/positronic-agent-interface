@@ -65,7 +65,8 @@ def _existing_names(project_dir, answers: list) -> list:
     return found
 
 
-def init_run(dir, *, brains=None, force=False, live=None) -> dict:
+def init_run(dir, *, brains=None, force=False, live=None,
+             auto_consolidate=None, auto_prune=None) -> dict:
     """Run the init wizard; returns {ok, warning?, brains, created, existing, configPath, live?}.
 
     No brains → help text (no side-effects). Existing brain without force →
@@ -101,15 +102,24 @@ def init_run(dir, *, brains=None, force=False, live=None) -> dict:
     except Exception:
         existing_cfg = {}
     live_val = live if live is not None else existing_cfg.get("live", True)
+    prev_auto = existing_cfg.get("auto") or {}
+    auto = {
+        "consolidate_every": auto_consolidate if auto_consolidate is not None
+                              else prev_auto.get("consolidate_every", 300),
+        "prune_every": auto_prune if auto_prune is not None
+                        else prev_auto.get("prune_every", 1000),
+    }
     merged = {
         "brains": {**(existing_cfg.get("brains") or {}), **new_brains},
         "live": live_val,
         "embed": existing_cfg.get("embed") or {"local_url": "http://127.0.0.1:8090"},
         "engram_tag": existing_cfg.get("engram_tag") or ENGRAM_TAG,
+        "auto": auto,
     }
     save_config(dir, merged)
 
     return {
         "ok": True, "brains": new_brains, "created": list(new_brains.keys()),
         "existing": existing, "configPath": cfg_path, "live": live_val,
+        "auto": auto,
     }

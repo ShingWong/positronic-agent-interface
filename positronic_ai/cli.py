@@ -46,7 +46,8 @@ OPS = {
 USAGE = "positronic <verb> [args]\nverbs: " + " | ".join(OPS)
 
 _VALUE_FLAGS = {"brain", "k", "sql", "cue", "text", "arousal", "tier",
-                "status", "tail", "pin", "value", "key", "profile", "embed"}
+                "status", "tail", "pin", "value", "key", "profile", "embed",
+                "auto-consolidate", "auto-prune"}
 
 
 def _parse(argv):
@@ -123,8 +124,10 @@ def _run(verb, dir, args, flags):
             live = _flag(flags, "live")
         elif _flag(flags, "no-live"):
             live = False
+        ac = _int(flags, "auto-consolidate", None)
+        ap = _int(flags, "auto-prune", None)
         return OPS["init"](dir, brains=brains, force=_flag(flags, "force"),
-                           live=live)
+                           live=live, auto_consolidate=ac, auto_prune=ap)
     if verb == "info":
         return OPS["info"](dir)
     if verb == "wake":
@@ -168,7 +171,8 @@ def _run(verb, dir, args, flags):
                                   arousal=_float(flags, "arousal", 0.4))
     if verb == "ingest":
         return OPS["ingest"](dir, _text(args, flags), brain=_brain(flags),
-                             arousal=_float(flags, "arousal", 0.5))
+                             arousal=_float(flags, "arousal", 0.5),
+                             dedup=(_flag(flags, "dedup") if "dedup" in flags else None))
     if verb == "recall":
         return OPS["recall"](dir, _text(args, flags), k=_int(flags, "k", 8))
     if verb == "ask":

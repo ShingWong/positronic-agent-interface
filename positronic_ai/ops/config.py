@@ -57,6 +57,10 @@ def run(dir, *, key=None, value=None, brain=None, confirm=False,
         raise ValueError("PII path blocked")
     if key == "live" and isinstance(value, str):
         value = value.strip().lower() in _TRUE
+    if key == "dedup" and isinstance(value, str):
+        value = value.strip().lower() in _TRUE
+    if key in ("consolidate_every", "prune_every", "since_consolidate", "since_prune"):
+        value = int(value)
     if key == "profile" and value == "archival" and not confirm:
         before = json.loads(json.dumps(load_config(dir)))
         _mask(before, bool(show_secrets))
