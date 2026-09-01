@@ -26,9 +26,16 @@ from pathlib import Path
 
 from ..config import load_config
 from ..engine import open_engine
+from ..objects import object_digest, resolve_object
+
 
 def run(dir, text, *, k=8, brains=None) -> dict:
-    """Fuse per-brain activate hits; {results: [{brain, episode_id, tau, snippet, rrf_score, ...}]}."""
+    """Fuse per-brain activate hits; {results: [...], object?: {versions}}.
+
+    When the cue fuzzy-matches an object, a compact polytemporal digest
+    (versions) is attached — the agent decides how deep to dig (ask reveals
+    the full τ-ordered dossier).
+    """
     text = (text or "").strip()
     if not text:
         return {"results": []}
@@ -45,7 +52,7 @@ def run(dir, text, *, k=8, brains=None) -> dict:
         if not db.exists():
             continue
         try:
-            _s, e = open_engine(dir, name)
+            s, e = open_engine(dir, name)
             hits = e.activate({"text": text}, k=k)
         except Exception:
             continue
@@ -66,4 +73,26 @@ def run(dir, text, *, k=8, brains=None) -> dict:
         hit["rrf_score"] = round(hit["rrf_score"], 4)
         results.append(hit)
     results.sort(key=lambda h: -h["rrf_score"])
-    return {"results": results[:k]}
+    out: dict = {"results": results[:k]}
+
+    obj = _resolve_any(dir, names, text)
+    if obj is not None:
+        out["object"] = obj
+    return out
+
+
+def _resolve_any(project_dir, names, text) -> dict | None:
+    """First brain with a fuzzy object match wins; returns {versions, ...}."""
+    for name in names:
+        db = Path(project_dir) / ".positronic" / "brains" / name / "memory.db"
+        if not db.exists():
+            continue
+        try:
+            s, _e = open_engine(project_dir, name)
+        except Exception:
+            continue
+        row = resolve_object(s, text)
+        if row is None:
+            continue
+        return {**row, "versions": object_digest(s, row["id"])}
+    return None

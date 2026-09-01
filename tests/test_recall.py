@@ -105,3 +105,35 @@ def test_wake_brief():
         assert out["brief"] and isinstance(out["brief"], str)
         assert "anchors:" in out["brief"]
         assert "consolidated today:" in out["brief"]
+
+
+def _seed_recall_digest(dir):
+    from positronic_ai.brains import init_brain
+    from positronic_ai.ops.ingest import run as ingest
+    from positronic_ai.ops.consolidate import run as consolidate
+    init_brain(dir, "kairos", "balanced", "lexical")
+    ingest(dir, "deployed memory.db into the agent interface", arousal=0.5)
+    consolidate(dir, "digest: memory.db deploy shipped and verified", arousal=0.4)
+
+def test_recall_matching_cue_returns_polytemporal_digest():
+    import tempfile
+    from positronic_ai.ops.recall import run
+    with tempfile.TemporaryDirectory() as d:
+        _seed_recall_digest(d)
+        out = run(d, "memory.db")
+        assert out["results"]                       # live episodes still present
+        obj = out["object"]
+        assert obj["canonical_name"] == "memory.db"
+        v = obj["versions"]
+        assert v["sighting_count"] >= 2
+        assert v["tau_span"][0] < v["tau_span"][1]
+        assert v["oldest_tau"] == v["tau_span"][0]
+        assert "memory.db" in v["latest_consolidation"]
+
+def test_recall_nonmatching_cue_has_no_object_block():
+    import tempfile
+    from positronic_ai.ops.recall import run
+    with tempfile.TemporaryDirectory() as d:
+        _seed_recall_digest(d)
+        out = run(d, "zzz-nonexistent-qqq")
+        assert "object" not in out

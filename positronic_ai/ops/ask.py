@@ -26,20 +26,12 @@ from pathlib import Path
 
 from ..config import load_config
 from ..engine import open_engine
+from ..objects import object_sightings, resolve_object
 
-_OBJECT_SQL = ("SELECT id, canonical_name, kind, status, salience, "
-               "first_seen_tau, last_seen_tau FROM object "
-               "WHERE canonical_name = ? OR canonical_name LIKE ? "
-               "ORDER BY (canonical_name = ?) DESC LIMIT 1")
-_SIGHTINGS_SQL = ("SELECT os.episode_id, os.channel, os.confidence, "
-                  "e.tau, e.wall, e.subject_norm, e.kind "
-                  "FROM object_sighting os JOIN episode e ON os.episode_id=e.id "
-                  "WHERE os.object_id = ? ORDER BY e.tau DESC")
 
 def run(dir, object_name) -> dict:
     """Look up an object dossier across brains; {object, sightings, found}."""
-    object_name = (object_name or "").strip()
-    if not object_name:
+    if not (object_name or "").strip():
         return {"object": None, "sightings": [], "found": False}
     cfg = load_config(dir)
     for name in cfg.get("brains", {}):
@@ -48,14 +40,11 @@ def run(dir, object_name) -> dict:
             continue
         try:
             s, _e = open_engine(dir, name)
-            like = f"%{object_name}%"
-            row = s.conn.execute(_OBJECT_SQL,
-                                 (object_name, like, object_name)).fetchone()
+            row = resolve_object(s, object_name)
             if row is None:
                 continue
-            sightings = [dict(r) for r in s.conn.execute(
-                _SIGHTINGS_SQL, (row["id"],)).fetchall()]
-            return {"object": dict(row), "sightings": sightings, "found": True}
+            sightings = object_sightings(s, row["id"])
+            return {"object": row, "sightings": sightings, "found": True}
         except Exception:
             continue
     return {"object": None, "sightings": [], "found": False}
