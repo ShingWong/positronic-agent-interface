@@ -36,6 +36,28 @@ def test_recall_alpha_hits_kairos():
         assert hit["episode_id"] and hit["tau"] is not None
         assert "rrf_score" in hit and "snippet" in hit
 
+def test_recall_consolidation_mode():
+    import tempfile
+
+    from positronic_ai.brains import init_brain
+    from positronic_ai.ops.consolidate import run as consolidate
+    from positronic_ai.ops.ingest import run as ingest
+    from positronic_ai.ops.recall import run
+    with tempfile.TemporaryDirectory() as d:
+        init_brain(d, "kairos", "balanced", "lexical")
+        ingest(d, "memory alpha incident details", brain="kairos", arousal=0.5)
+        consolidate(d, "alpha incident summary", brain="kairos", arousal=0.5)
+        # 'only' → just the consolidation episode, no live message
+        out = run(d, "alpha", consolidation="only")
+        kinds = {h.get("kind") for h in out["results"]}
+        assert kinds == {"consolidation"}
+        assert any("summary" in (h.get("snippet") or "") for h in out["results"])
+        # default → live message present (freshness wins), mode off by default
+        outd = run(d, "alpha")
+        kinds_d = {h.get("kind") for h in outd["results"]}
+        assert "message" in kinds_d
+
+
 def test_recall_beta_hits_research():
     import tempfile
 
@@ -44,6 +66,7 @@ def test_recall_beta_hits_research():
         _seed_two_brains(d)
         out = run(d, "beta")
         assert any(h["brain"] == "research" for h in out["results"])
+
 
 def test_recall_shared_word_fuses_both_brains():
     import tempfile

@@ -47,7 +47,7 @@ USAGE = "positronic <verb> [args]\nverbs: " + " | ".join(OPS)
 
 _VALUE_FLAGS = {"brain", "k", "sql", "cue", "text", "arousal", "tier",
                 "status", "tail", "pin", "value", "key", "profile", "embed",
-                "auto-consolidate", "auto-prune", "role"}
+                "auto-consolidate", "auto-prune", "role", "consolidation"}
 
 
 def _parse(argv) -> tuple[list[str], dict]:
@@ -158,12 +158,16 @@ def _run(verb, dir, args, flags) -> dict:
         return OPS["delete"](dir, brain=_brain(flags),
                              force=_flag(flags, "force"))
     if verb == "query":
+        cons = flags.get("consolidation")
+        if cons not in (None, "only", "first"):
+            raise ValueError(
+                f"consolidation must be 'only' or 'first', got {cons!r}")
         return OPS["query"](dir, brain=_brain(flags), text=_text(args, flags),
                             sql=flags.get("sql"), cue=flags.get("cue"),
                             objects=_flag(flags, "objects"),
                             anchors=_flag(flags, "anchors"),
                             sightings=_flag(flags, "sightings"),
-                            k=_int(flags, "k", 8))
+                            k=_int(flags, "k", 8), consolidation=cons)
     if verb == "prune":
         return OPS["prune"](dir, brain=_brain(flags))
     if verb == "consolidate":
@@ -178,7 +182,12 @@ def _run(verb, dir, args, flags) -> dict:
                              dedup=(_flag(flags, "dedup") if "dedup" in flags else None),
                              role=role)
     if verb == "recall":
-        return OPS["recall"](dir, _text(args, flags), k=_int(flags, "k", 8))
+        cons = flags.get("consolidation")
+        if cons not in (None, "only", "first"):
+            raise ValueError(
+                f"consolidation must be 'only' or 'first', got {cons!r}")
+        return OPS["recall"](dir, _text(args, flags), k=_int(flags, "k", 8),
+                             consolidation=cons)
     if verb == "ask":
         return OPS["ask"](dir, " ".join(args) or flags.get("text") or "")
     if verb == "doctor":

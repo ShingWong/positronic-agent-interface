@@ -60,7 +60,8 @@ def _human(parsed) -> str:
     return json.dumps(parsed, default=str)[:200]
 
 def run(dir, *, brain=None, text=None, sql=None, cue=None,
-        objects=False, anchors=False, sightings=False, k=8) -> dict:
+        objects=False, anchors=False, sightings=False, k=8,
+        consolidation=None) -> dict:
     brain = brain or "kairos"
     k = k or 8
     try:
@@ -78,16 +79,17 @@ def run(dir, *, brain=None, text=None, sql=None, cue=None,
     elif objects:
         rows = [dict(r) for r in s.conn.execute(_OBJECTS_SQL.format(k)).fetchall()]
     elif cue:
-        rows = e.activate({"text": cue}, k=k)
+        rows = e.activate({"text": cue}, k=k, consolidation=consolidation)
     else:
         qtext = (text or "").strip()
         if not qtext:
             return {"ok": True, "help": True, "usage": USAGE,
                     "human": ("usage: positronic query <text> | --sql <SQL> "
                               "| --cue <text> | --anchors | --objects | "
-                              "--sightings [--brain kairos] [--k 8]")}
+                              "--sightings [--brain kairos] [--k 8] "
+                              "[--consolidation only|first]")}
         t0 = time.perf_counter()
-        hits = e.activate({"text": qtext}, k=k)
+        hits = e.activate({"text": qtext}, k=k, consolidation=consolidation)
         ms = (time.perf_counter() - t0) * 1000
         out = {"ok": True, "brain": brain, "ms": _round(ms, 2),
                "hits": len(hits), "results": hits}
