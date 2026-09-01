@@ -57,12 +57,24 @@ The brain stores **polytemporal objects** — one canonical entity, a family of 
 - `recall "<cue>"` → live RRF episode hits **plus** an `object` block when the cue fuzzy-matches an
   object. The block is a **digest**: `{sighting_count, tau_span, latest_consolidation, oldest_tau}` —
   enough to know depth exists without dumping the data.
+- `recall "<cue>" --consolidation only|first` → a **distilled-memory view** when you want conclusions,
+  not chatter: `only` returns just consolidation episodes (strict — may return fewer than `k`),
+  `first` ranks consolidations ahead of live messages then fills. The consolidation channel is
+  kind-scoped, so live chatter can't drown a matching consolidation. Default is full recall —
+  needle-in-haystack retrieval is untouched.
 - `ask "<object>"` → the **full τ-ordered dossier** — every sighting with its own `tau`/`wall`/`kind`.
-  This is the dig-deeper verb: read the headline, then decide how far back to go.
+  This is the dig-deeper verb: read the headline, then decide how far back to go. Use `ask` for
+  *object history*; `--consolidation only` for *session-boundary summaries* — they answer different
+  questions.
+- **Retrieval normalization:** dossier/digest text falls back to
+  `json_extract(features_json,'$.body_text')` when `subject_norm` is NULL (early episodes), and
+  object resolution matches hyphen/underscore-normalized names — a spaced cue (`opencode plugin`)
+  resolves a hyphenated entity (`positronic-opencode-plugin`).
 
 ```bash
-positronic recall "prune_merge" --json     # digest: 30 sightings, tau span, latest consolidation
-positronic ask "prune_merge" --json        # full dossier, every sighting in τ order
+positronic recall "prune_merge" --json                    # digest: 30 sightings, tau span, latest consolidation
+positronic recall "prune_merge" --consolidation only      # distilled conclusions only
+positronic ask "prune_merge" --json                       # full dossier, every sighting in τ order
 ```
 
 The engine records the family; the agent reasons over it. Same move as opening older commits when
