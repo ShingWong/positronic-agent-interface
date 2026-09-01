@@ -29,7 +29,7 @@ CONFIG_KEYS = {"profile", "embed", "threshold", "live",
                "since_consolidate", "since_prune"}
 _DEFAULT = {"brains": {}, "live": True,
             "embed": {"local_url": "http://127.0.0.1:8090"}, "engram_tag": ENGRAM_TAG,
-            "auto": {"consolidate_every": 300, "prune_every": 1000},
+            "auto": {"consolidate_every": 0, "prune_every": 0},
             "counters": {"since_consolidate": 0, "since_prune": 0},
             "dedup": False}
 

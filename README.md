@@ -61,6 +61,54 @@ Every verb works as `positronic <verb>` or `python -m positronic_ai <verb>`.
   (`lexical` \| `local` \| `remote`), `threshold`.
 - Top-level: `live` (bool), `local_url`, `remote_url`, `remote_key`,
   `engram_tag`.
+- Lifecycle: `auto.consolidate_every`, `auto.prune_every` (episode counts,
+  `0` = disabled — the default), `counters.since_consolidate`,
+  `counters.since_prune` (running tallies), `dedup` (bool, skip exact-repeat
+  messages).
+
+## Memory lifecycle: compaction-driven by default
+
+Forgetting and summarization are wired to the agent's **compaction event**,
+not to a timer or a prompt counter. When an agent session compacts — opencode
+fires `session.compacted`; Claude Code fires `PreCompact` — the plugin:
+
+1. **prunes** the brain (τ-decay demote/expire per the retention profile), and
+2. writes a **consolidation marker** (a `kind='consolidation'` episode).
+
+That is the primary lifecycle. It costs nothing when nothing compacts, and it
+fires exactly when old context is being summarized away — the natural moment
+to forget and to write a summary.
+
+**Why the counters are off by default.** The counter-based auto-triggers
+(`auto.consolidate_every` / `auto.prune_every`) are an *opt-in fallback* for
+sessions that never compact: long-running, low-churn context where no era
+boundary ever fires. They advance on every non-duplicate message ingest and
+run the same `consolidate` / `prune` operations at a fixed cadence. They are
+**disabled by default** (`0`) because:
+
+- a compaction-driven lifecycle already covers the common case, and
+- a blind counter (e.g. every 300/1000 prompts) would fire regardless of
+  whether the context actually reached an era boundary, writing redundant
+  markers or pruning too eagerly on a quiet session.
+
+To enable, either set them at init or via the config command:
+
+```bash
+positronic init --brain kairos --auto-consolidate 300 --auto-prune 1000
+positronic config consolidate_every 300
+positronic config prune_every 1000
+```
+
+`0` disables a trigger. `counters.since_consolidate` / `since_prune` track
+messages since the last run and reset when a trigger fires (or when a
+compaction-driven prune/consolidate runs via a hook).
+
+**Dedup.** `dedup: true` makes `ingest` skip a message whose `body_text`
+matches the most recent episode (string compare), returning
+`{duplicate: true, skipped: true}` without writing or advancing counters.
+Claude Code enables this per-call (`--dedup` on its `UserPromptSubmit` hook)
+because a repeated prompt must not re-ingest itself; opencode leaves it off
+since its `chat.message` capture records distinct turns.
 
 ## JSON output
 

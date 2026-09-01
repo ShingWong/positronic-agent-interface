@@ -31,7 +31,7 @@ def _seed(dir):
 def test_config_defaults():
     with tempfile.TemporaryDirectory() as d:
         cfg = load_config(d)
-        assert cfg["auto"] == {"consolidate_every": 300, "prune_every": 1000}
+        assert cfg["auto"] == {"consolidate_every": 0, "prune_every": 0}
         assert cfg["counters"] == {"since_consolidate": 0, "since_prune": 0}
         assert cfg["dedup"] is False
 

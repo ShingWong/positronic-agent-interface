@@ -105,9 +105,9 @@ def init_run(dir, *, brains=None, force=False, live=None,
     prev_auto = existing_cfg.get("auto") or {}
     auto = {
         "consolidate_every": auto_consolidate if auto_consolidate is not None
-                              else prev_auto.get("consolidate_every", 300),
+                              else prev_auto.get("consolidate_every", 0),
         "prune_every": auto_prune if auto_prune is not None
-                        else prev_auto.get("prune_every", 1000),
+                        else prev_auto.get("prune_every", 0),
     }
     merged = {
         "brains": {**(existing_cfg.get("brains") or {}), **new_brains},
