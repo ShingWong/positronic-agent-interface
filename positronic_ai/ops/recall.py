@@ -1,0 +1,69 @@
+# =====================================================================
+# Project Positronic — Polytemporal Cognitive Engram Memory Substrate
+# Copyright (C) 2026 Shing Wong. All Rights Reserved.
+# =====================================================================
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://gnu.org>.
+# =====================================================================
+
+"""Recall verb — federated fuzzy recall fused across all configured brains.
+
+Public-safe: touches only `.positronic/brains/*` (never the private
+kairos_brain). Per-brain `activate` hits are merged with reciprocal-rank
+fusion (RRF); each hit is tagged with its source brain.
+"""
+from pathlib import Path
+
+from ..config import load_config
+from ..engine import open_engine
+
+def run(dir, text, *, k=8, brains=None) -> dict:
+    """Fuse per-brain activate hits; {results: [{brain, episode_id, tau, snippet, rrf_score, ...}]}."""
+    text = (text or "").strip()
+    if not text:
+        return {"results": []}
+    cfg = load_config(dir)
+    all_brains = cfg.get("brains", {})
+    if brains is None:
+        names = list(all_brains.keys())
+    else:
+        names = [b for b in brains if b in all_brains]
+
+    ranked: dict[str, dict] = {}
+    for name in names:
+        db = Path(dir) / ".positronic" / "brains" / name / "memory.db"
+        if not db.exists():
+            continue
+        try:
+            _s, e = open_engine(dir, name)
+            hits = e.activate({"text": text}, k=k)
+        except Exception:
+            continue
+        for i, hit in enumerate(hits):
+            eid = hit.get("episode_id")
+            if not eid:
+                continue
+            merged = ranked.setdefault(eid, {})
+            merged["rrf_score"] = merged.get("rrf_score", 0.0) + 1.0 / (60.0 + i)
+            if "brain" not in merged:
+                merged["brain"] = name
+            for key, val in hit.items():
+                if key != "rrf_score":
+                    merged[key] = val
+
+    results = []
+    for hit in ranked.values():
+        hit["rrf_score"] = round(hit["rrf_score"], 4)
+        results.append(hit)
+    results.sort(key=lambda h: -h["rrf_score"])
+    return {"results": results[:k]}
