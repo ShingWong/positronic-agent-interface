@@ -16,11 +16,9 @@
 # along with this program. If not, see <https://gnu.org>.
 # =====================================================================
 
-"""Verb ops — one module per verb, each exporting run(...) -> dict."""
-from . import (ask, brain_test, config, consolidate, delete, doctor, info,
-               ingest, init, llm_setup, llm_stat, prune, query, recall, stats,
-               update, wake)
+"""python -m positronic_ai entry point."""
+import sys
 
-__all__ = ["ask", "brain_test", "config", "consolidate", "delete", "doctor",
-           "info", "ingest", "init", "llm_setup", "llm_stat", "prune",
-           "query", "recall", "stats", "update", "wake"]
+from .cli import main
+
+sys.exit(main())
