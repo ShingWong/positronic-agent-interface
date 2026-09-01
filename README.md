@@ -128,6 +128,56 @@ positronic recall "topic"
 `recall` fuses hits across every configured brain and returns ranked memories.
 Use `ask` for a natural-language answer over that memory.
 
+## Wire it into your agent (CLAUDE.md / AGENTS.md)
+
+The memory is only worth something if the agent actually reaches for it. The
+single highest-leverage setup step is a **one-rule instruction in your
+agent's config file**: *query the brain before you re-derive.* Retrieval is
+single-digit milliseconds; re-reading a codebase from scratch is not. In our
+own repo this rule is the difference between a 3ms recall that surfaces last
+week's decisions and a full re-read of the same files.
+
+**opencode** — add to your project's `AGENTS.md`:
+
+```markdown
+## Dogfooding: recall before resuming (mandatory)
+
+Before resuming work in this repo — a new task, a follow-up edit, or an
+executing-plans session — run the brain first to ground in prior decisions:
+
+```bash
+positronic recall "<topic>" --json     # or python -m positronic_ai recall ...
+```
+
+Retrieval is fast (single-digit ms) and surfaces the session decisions live
+ingestion already captured, saving the re-read. This rule binds the main
+agent and every subagent: query/recall before you re-derive.
+```
+
+**Claude Code** — add the same rule to your project's `CLAUDE.md` (or rely on
+the `memory` skill bundled with the claude-code plugin, which teaches the
+model to run `recall`/`query`/`ask` when it needs prior context):
+
+```markdown
+## Memory
+
+This project has a polytemporal memory brain (`.positronic/`). Before
+answering about prior work, decisions, or history, run
+`python -m positronic_ai recall "<topic>" --json` and use the results.
+Don't guess from scratch — recall is milliseconds.
+```
+
+Key points to convey:
+
+- **Recall, don't re-read.** Ingestion is automatic (live hooks per session);
+  retrieval is the cheap operation.
+- **Bind every agent.** State the rule so it also applies to subagents —
+  a main agent that recalls but whose subagents re-derive wastes the setup.
+- **Plan docs too.** Long-running work should carry a recall step in its
+  plan (e.g. "before Task 0, `positronic recall "<feature>"` to surface prior
+  decisions"). The umbrella `AGENTS.md` in the positronic monorepo is a
+  working example of all of the above.
+
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
