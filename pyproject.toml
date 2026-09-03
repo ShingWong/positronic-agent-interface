@@ -9,7 +9,7 @@ description = "Polytemporal memory agent interface over memeng"
 license = "GPL-3.0-or-later"
 requires-python = ">=3.10"
 dependencies = [
-  "memeng @ git+https://github.com/ShingWong/positronic-engram.git@v0.2.0",
+  "memeng @ git+https://github.com/ShingWong/positronic-engram.git@v0.2.0#subdirectory=engine",
 ]
 
 [project.scripts]
