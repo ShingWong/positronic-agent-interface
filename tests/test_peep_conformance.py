@@ -144,8 +144,8 @@ def test_peep_dossier_is_tau_ordered():
         sights = out.get("sightings") or []
         assert sights, "dossier empty"
         taus = [x["tau"] for x in sights]
-        assert taus == sorted(taus, reverse=True) or taus == sorted(taus), \
-            "sightings not τ-ordered"
+        assert taus == sorted(taus), \
+            "sightings not τ-ordered ascending (RFC 3.3)"
         for s_ in sights:
             assert "episode_id" in s_
             assert s_.get("kind") in ("message", "consolidation")

@@ -34,13 +34,13 @@ _SIGHTINGS_SQL = ("SELECT os.episode_id, os.channel, os.confidence, "
                   "COALESCE(e.subject_norm, "
                   "json_extract(e.features_json,'$.body_text')) AS body_text "
                   "FROM object_sighting os JOIN episode e ON os.episode_id=e.id "
-                  "WHERE os.object_id = ? ORDER BY e.tau DESC")
+                  "WHERE os.object_id = ? ORDER BY e.tau ASC")
 _CONSOLIDATION_SQL = ("SELECT COALESCE(e.subject_norm, "
                       "json_extract(e.features_json,'$.body_text')) "
                       "AS subject_norm FROM object_sighting os "
                       "JOIN episode e ON os.episode_id=e.id "
                       "WHERE os.object_id = ? AND e.kind='consolidation' "
-                      "ORDER BY e.tau DESC LIMIT 1")
+                      "ORDER BY e.tau ASC LIMIT 1")
 _DIGEST_SQL = ("SELECT COUNT(*) AS sighting_count, "
                "COALESCE(MIN(e.tau),0.0) AS oldest_tau, "
                "COALESCE(MAX(e.tau),0.0) AS latest_tau "
