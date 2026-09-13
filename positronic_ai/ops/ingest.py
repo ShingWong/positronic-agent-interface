@@ -53,6 +53,10 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
                           features={"subject_norm": subj, "body_text": text,
                                     "arousal": arousal, "role": role}))
     out = {"tau": r.tau, "encoded": bool(r.verdict.encoded), "episode_id": str(r.episode_id)}
+    emb = getattr(e, "_embedder", None)
+    out["embedded"] = bool(emb)
+    if not emb:
+        out["embed_reason"] = "no embedder bound (init --embed local + local_url)"
     if kind == "message":
         _advance_counters(dir, name)
     return out

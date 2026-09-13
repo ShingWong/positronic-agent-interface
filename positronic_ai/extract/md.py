@@ -16,24 +16,14 @@
 # along with this program. If not, see <https://gnu.org>.
 # =====================================================================
 
-"""Engine open helper — resolve a project brain DB to (store, engine)."""
-import pathlib
-
-from memeng.engine import MemoryEngine
-from memeng.store import SQLiteStore
-
-from .config import load_config
+"""Normalize markdown (from .md files or html_to_markdown) for chunking:
+collapse 3+ newlines, squeeze inner whitespace, keep heading/list/table
+markers intact — the chunker splits on them downstream."""
+import re
 
 
-def open_engine(project_dir, brain: str) -> tuple[SQLiteStore, MemoryEngine]:
-    db = pathlib.Path(project_dir) / ".positronic" / "brains" / brain / "memory.db"
-    if not db.exists():
-        raise FileNotFoundError(f"no such brain db: {db}")
-    s = SQLiteStore(str(db))
-    e = MemoryEngine(s)
-    cfg = load_config(project_dir)
-    if (cfg.get("brains", {}).get(brain, {}) or {}).get("embed") == "local":
-        from .embed import embed_one
-        local_url = (cfg.get("embed") or {}).get("local_url", "http://127.0.0.1:8090")
-        e.bind_embedder(lambda text: embed_one(text, local_url)[0])
-    return s, e
+def md_normalize(md: str) -> str:
+    text = md.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    lines = [re.sub(r"[ \t]{2,}", " ", ln).rstrip() for ln in text.split("\n")]
+    return "\n".join(lines).strip()

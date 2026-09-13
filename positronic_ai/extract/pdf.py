@@ -16,24 +16,22 @@
 # along with this program. If not, see <https://gnu.org>.
 # =====================================================================
 
-"""Engine open helper — resolve a project brain DB to (store, engine)."""
-import pathlib
-
-from memeng.engine import MemoryEngine
-from memeng.store import SQLiteStore
-
-from .config import load_config
+"""PDF text layer via poppler pdftotext. Scanned (textless) PDFs are NOT
+handled here — they route to OCR (tesseract) per the build plan."""
+import shutil
+import subprocess
 
 
-def open_engine(project_dir, brain: str) -> tuple[SQLiteStore, MemoryEngine]:
-    db = pathlib.Path(project_dir) / ".positronic" / "brains" / brain / "memory.db"
-    if not db.exists():
-        raise FileNotFoundError(f"no such brain db: {db}")
-    s = SQLiteStore(str(db))
-    e = MemoryEngine(s)
-    cfg = load_config(project_dir)
-    if (cfg.get("brains", {}).get(brain, {}) or {}).get("embed") == "local":
-        from .embed import embed_one
-        local_url = (cfg.get("embed") or {}).get("local_url", "http://127.0.0.1:8090")
-        e.bind_embedder(lambda text: embed_one(text, local_url)[0])
-    return s, e
+def pdf_to_text(path: str, layout: bool = True) -> str:
+    bin_ = shutil.which("pdftotext")
+    if not bin_:
+        raise RuntimeError("pdftotext not on PATH (apt install poppler-utils)")
+    args = [bin_, "-enc", "UTF-8"]
+    if layout:
+        args.append("-layout")
+    args += [path, "-"]
+    r = subprocess.run(args, capture_output=True, text=True, timeout=300,
+                       check=False)
+    if r.returncode != 0:
+        raise RuntimeError(f"pdftotext failed: {r.stderr[:200]}")
+    return r.stdout

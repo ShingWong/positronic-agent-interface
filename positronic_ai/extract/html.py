@@ -16,24 +16,22 @@
 # along with this program. If not, see <https://gnu.org>.
 # =====================================================================
 
-"""Engine open helper — resolve a project brain DB to (store, engine)."""
-import pathlib
-
-from memeng.engine import MemoryEngine
-from memeng.store import SQLiteStore
-
-from .config import load_config
+"""HTML -> markdown via system html2text. Markdown is the canonical
+intermediate: one chunker serves HTML and md inputs."""
+import shutil
+import subprocess
 
 
-def open_engine(project_dir, brain: str) -> tuple[SQLiteStore, MemoryEngine]:
-    db = pathlib.Path(project_dir) / ".positronic" / "brains" / brain / "memory.db"
-    if not db.exists():
-        raise FileNotFoundError(f"no such brain db: {db}")
-    s = SQLiteStore(str(db))
-    e = MemoryEngine(s)
-    cfg = load_config(project_dir)
-    if (cfg.get("brains", {}).get(brain, {}) or {}).get("embed") == "local":
-        from .embed import embed_one
-        local_url = (cfg.get("embed") or {}).get("local_url", "http://127.0.0.1:8090")
-        e.bind_embedder(lambda text: embed_one(text, local_url)[0])
-    return s, e
+def _bin() -> str:
+    p = shutil.which("html2text")
+    if not p:
+        raise RuntimeError("html2text not on PATH (apt install html2text)")
+    return p
+
+
+def html_to_markdown(html: str) -> str:
+    r = subprocess.run([_bin(), "-nobs"], input=html, capture_output=True,
+                       text=True, timeout=60, check=False)
+    if r.returncode != 0:
+        raise RuntimeError(f"html2text failed: {r.stderr[:200]}")
+    return r.stdout
