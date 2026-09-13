@@ -12,17 +12,30 @@ positronic init --embed lexical
 positronic doctor
 ```
 
-## Tier 2 — Remote API (30ms, no local build)
+## Tier 2 — Embedding endpoint tiers: `local` vs `remote`
 
-Set hosted embedding endpoint + key, then init:
+A bge-m3 server anywhere on the LAN counts as **`local`** — the tier names the
+binding protocol, not the process location. `engine.open_engine` binds
+`embed_one` (llama.cpp `/embedding`, served per Tier 3) for brains whose config
+says `embed: local`:
 
 ```bash
-export OPENAI_API_KEY=sk-...
-# or hosted BGE-M3 / nomic
-export REMOTE_EMBED_URL=https://api.openai.com/v1
-positronic init --embed remote --base-url $REMOTE_EMBED_URL
-# config: .positronic/config.json → embed.remote_url / remote_key
+positronic init --brain mail --profile long_term --embed local
+positronic config local_url http://<host>:8090    # default http://127.0.0.1:8090
 ```
+
+`remote` is API-key-style hosted embedding only (`embed.remote_url` +
+`embed.remote_key` in `.positronic/config.json`; `config` masks the key without
+`--show-secrets`). As of this release no embedder binds for `remote` brains —
+they encode FTS-only until an API embedder lands.
+
+Chunking at bind time: `embed_one` pre-splits with `chunk_markdown` to ~1200
+tokens (~7200 chars) and mean-pools the pieces into the single `body_embed`
+vector. llama.cpp caps requests at 2048 tokens (measured: HTTP 500 "too large
+to process"; fitted leaf ~6.2k chars) — oversized pieces are halved-and-resent,
+up to 5 levels, then it raises loudly. `embedded: true` in an ingest result
+means "embedder bound", not "vector present" (memeng's embedder call is
+best-effort).
 
 ## Tier 3 — Local BGE-M3 (recommended, 18–35ms) ⭐
 
