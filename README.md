@@ -120,7 +120,7 @@ positronic stats                       # per-brain episode counts
 | `query` | query a brain: text, `--sql`, `--cue`, `--anchors`, `--objects`, `--sightings` (`--k N`) |
 | `prune` | prune a brain's memory (`--brain NAME`) |
 | `consolidate` | consolidate episodes (`--arousal F`, `--brain NAME`) |
-| `ingest` | ingest an event into a brain (`--arousal F`, `--brain NAME`) |
+| `ingest` | ingest an event into a brain (`--arousal F`, `--brain NAME`; message metadata `sender`/`date`/`message_id` persisted, hard-deduped by message-id) |
 | `recall` | fused recall across federated brains (`--k N`) |
 | `ask` | answer a question from brain memory |
 | `wake` | trigger a consolidation marker + prune sweep |
@@ -129,6 +129,10 @@ positronic stats                       # per-brain episode counts
 Every verb works as `positronic <verb>` or `python -m positronic_ai <verb>`, and returns
 JSON-serializable dicts. Full signature + return contract: `api-spec.md`; design rationale:
 `DESIGN.md`.
+
+Browser/mail clients can talk REST instead of CLI: `python -m positronic_ai.server`
+(FastAPI wrapper over the same verbs, default `:8080`) — see the HTTP server
+section in `api-spec.md`.
 
 ---
 

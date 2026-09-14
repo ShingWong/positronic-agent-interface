@@ -17,6 +17,8 @@ operation as a code API (`positronic_ai.*`) and a CLI verb (`positronic` /
   per brain; `live|local_url|remote_url|remote_key|engram_tag` top-level).
 - `positronic_ai/engine.py` — memeng engine helper.
 - `positronic_ai/ops/` — one module per verb; each exports `run(...) -> dict`.
+- `positronic_ai/extract/` — attachment/body extraction (`html`, `pdf`, `office`, `mail`, `attach`).
+- `positronic_ai/server/` — optional FastAPI transport (`app.py`; `python -m positronic_ai.server`).
 - `positronic_ai/cli.py` — verb dispatch (console script `positronic`).
 - `positronic_ai/__main__.py` — `python -m positronic_ai` entry.
 - `tests/` — pytest.

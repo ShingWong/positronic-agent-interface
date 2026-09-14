@@ -91,12 +91,18 @@ Write a `kind='consolidation'` event (the distilled summary of a session).
 
 **Returns**: `{ok, tau, encoded, episode_id}`.
 
-## `ingest(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None, dedup=None, role="assistant") -> dict`
+## `ingest(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None, dedup=None, role="assistant", sender=None, date=None, message_id=None) -> dict`
 
-Write a raw observation. `dedup` dedupes consecutive same-body messages per
-role; `role` tags `user`/`assistant` (gated by `capture_user` config).
+Write a raw observation. Consecutive-body `dedup` (per role) applies only when
+no `message_id` is given; a normalized RFC `message_id` (angle brackets
+stripped, via `normalize_message_id`) dedupes hard across the whole brain
+regardless of intervening events. `sender` / `date` / `message_id` are stored
+in `features_json` when truthy (mail metadata). `role` tags `user`/`assistant`
+(gated by `capture_user` config).
 
-**Returns**: `{tau, encoded, episode_id}` (or `{duplicate, skipped, tau}`).
+**Returns**: `{tau, encoded, episode_id, embedded, embed_reason?}` (or
+`{duplicate, skipped, tau, episode_id?, by?}` — `by: "message_id"` when the
+hard message-id gate fired).
 
 ## `recall(dir, text, *, k=8, brains=None) -> dict`
 
@@ -139,6 +145,8 @@ Shared by `recall` and `ask`; the polytemporal contract lives here.
 - init creates brains + config; delete warns without force and wipes with it.
 - config get masks `remote_key`; set gates archival on confirm; PII paths blocked.
 - ingest writes an event; dedup skips consecutive identical bodies.
+- ingest persists `sender` / `date` / `message_id`; re-ingest of the same
+  normalized `message_id` returns `{duplicate, by: "message_id"}`.
 - recall fuses across brains; object digest attaches on fuzzy match; non-match
   returns live results only.
 - ask returns full dossier; unknown object → `found: False`.
@@ -146,3 +154,37 @@ Shared by `recall` and `ask`; the polytemporal contract lives here.
 - prune returns a PruneReport; skips when `live=false`.
 - brain-test writes + recalls a probe event.
 - auto lifecycle: consolidate/prune fire on counters reaching `auto.*`.
+
+---
+
+## HTTP server (`positronic_ai.server`, optional)
+
+`python -m positronic_ai.server` starts a FastAPI transport over the same verbs
+(`positronic_ai/server/app.py`) — a thin REST wrapper for browser clients
+(e.g. the Thunderbird email plugin). No new logic: every route delegates to the
+matching `ops.<verb>.run`.
+
+Env: `POSITRONIC_PROJECT_DIR` (default CWD), `POSITRONIC_SERVER_HOST`
+(default `0.0.0.0`), `POSITRONIC_SERVER_PORT` (default `8080`),
+`POSITRONIC_MAIL_BRAIN` (default brain for mail ingestion when the client
+sends none).
+
+| Route | Body | Verb |
+|-------|------|------|
+| `GET /health` | — | liveness + project dir |
+| `GET /info` | — | `info` |
+| `GET /stats` | — | `stats` |
+| `POST /ingest` | `IngestMailRequest` | `ingest` (per-user `brain`, auto-provisioned) |
+| `POST /recall` | `{text, k, brains?, ...}` | `recall` |
+| `POST /query` | `QueryRequest` | `query` |
+| `POST /ask` | `{object_name}` | `ask` |
+| `POST /brain-test` | `{brain?, k?}` | `brain_test` |
+
+`POST /ingest` accepts `{subject, body, sender, date, messageId, brain?,
+attachments?}`. The `brain` field is sanitized (`sanitize_brain`: lowercase,
+non-alphanumerics → `_`, max 40 chars) and the brain is auto-provisioned
+(`balanced`/`lexical`) on first use, so a mail client can route per account
+without pre-creating brains. An empty body is stored honestly (not replaced by
+the subject); the response adds `brain` + `body_chars` so clients can warn.
+
+The `server` extra needs `fastapi` + `uvicorn` (not in core deps).

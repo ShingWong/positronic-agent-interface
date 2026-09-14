@@ -26,8 +26,19 @@ from ..config import load_config, save_config
 from ..engine import open_engine
 
 
+def normalize_message_id(raw) -> str:
+    """Normalize an RFC Message-ID for dedup: strip whitespace and <>."""
+    if not raw:
+        return ""
+    mid = str(raw).strip()
+    if mid.startswith("<") and mid.endswith(">") and len(mid) > 2:
+        mid = mid[1:-1].strip()
+    return mid
+
+
 def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
-        dedup=None, role="assistant") -> dict:
+        dedup=None, role="assistant", sender=None, date=None,
+        message_id=None) -> dict:
     cfg = load_config(dir)
     if cfg.get("live") is False and kind == "message":
         return {"encoded": False, "reason": "live=false"}
@@ -36,8 +47,18 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
         raise ValueError("no brains configured — run positronic init")
     s, e = open_engine(dir, name)
 
+    mid = normalize_message_id(message_id)
+    if kind == "message" and mid:
+        row = s.conn.execute(
+            "SELECT id FROM episode WHERE kind='message' "
+            "AND json_extract(features_json,'$.message_id') = ? "
+            "LIMIT 1", (mid,)).fetchone()
+        if row is not None:
+            return {"duplicate": True, "skipped": True, "tau": None,
+                    "episode_id": row["id"], "by": "message_id"}
+
     dedup_eff = cfg.get("dedup") if dedup is None else dedup
-    if kind == "message" and dedup_eff:
+    if kind == "message" and dedup_eff and not mid:
         row = s.conn.execute(
             "SELECT features_json FROM episode WHERE kind='message' "
             "AND json_extract(features_json,'$.role') = ? "
@@ -48,10 +69,17 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
                 return {"duplicate": True, "skipped": True, "tau": None}
 
     subj = subject or text[:80]
+    features = {"subject_norm": subj, "body_text": text,
+                "arousal": arousal, "role": role}
+    if sender:
+        features["sender"] = str(sender)
+    if date:
+        features["date"] = str(date)
+    if mid:
+        features["message_id"] = mid
     r = e.new_event(Event(stream=f"positronic:{name}", kind=kind,
                           persons=["p_kairos"], wall=datetime.now(timezone.utc),
-                          features={"subject_norm": subj, "body_text": text,
-                                    "arousal": arousal, "role": role}))
+                          features=features))
     out = {"tau": r.tau, "encoded": bool(r.verdict.encoded), "episode_id": str(r.episode_id)}
     emb = getattr(e, "_embedder", None)
     out["embedded"] = bool(emb)
