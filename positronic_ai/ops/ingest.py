@@ -38,7 +38,7 @@ def normalize_message_id(raw) -> str:
 
 def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
         dedup=None, role="assistant", sender=None, date=None,
-        message_id=None) -> dict:
+        message_id=None, threat=True) -> dict:
     cfg = load_config(dir)
     if cfg.get("live") is False and kind == "message":
         return {"encoded": False, "reason": "live=false"}
@@ -77,6 +77,17 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
         features["date"] = str(date)
     if mid:
         features["message_id"] = mid
+    verdict = {"tag": "clean", "reasons": []}
+    if threat and kind == "message" and sender:
+        hist = s.conn.execute(
+            "SELECT COUNT(*) c FROM episode WHERE kind='message' "
+            "AND json_extract(features_json,'$.sender') = ?",
+            (str(sender),)).fetchone()
+        from ..threat import score_threat
+        verdict = score_threat(sender, subj, text,
+                               (hist["c"] if hist else 0))
+        features["threat_tag"] = verdict["tag"]
+        features["threat_reasons"] = verdict["reasons"]
     r = e.new_event(Event(stream=f"positronic:{name}", kind=kind,
                           persons=["p_kairos"], wall=datetime.now(timezone.utc),
                           features=features))
@@ -87,6 +98,8 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
         out["embed_reason"] = "no embedder bound (init --embed local + local_url)"
     if kind == "message":
         _advance_counters(dir, name)
+    if verdict["tag"] != "clean" or verdict["reasons"]:
+        out["threat"] = verdict
     return out
 
 

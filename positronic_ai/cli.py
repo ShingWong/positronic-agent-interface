@@ -39,6 +39,7 @@ OPS = {
     "ingest": ops.ingest.run,
     "recall": ops.recall.run,
     "ask": ops.ask.run,
+    "tag": ops.tag.run,
     "wake": ops.wake.run,
     "doctor": ops.doctor.run,
 }
@@ -48,7 +49,7 @@ USAGE = "positronic <verb> [args]\nverbs: " + " | ".join(OPS)
 _VALUE_FLAGS = {"brain", "k", "sql", "cue", "text", "arousal", "tier",
                 "status", "tail", "pin", "value", "key", "profile", "embed",
                 "auto-consolidate", "auto-prune", "role", "consolidation",
-                "context"}
+                "context", "tag", "episode-id", "episode", "message-id"}
 
 
 def _parse(argv) -> tuple[list[str], dict]:
@@ -193,6 +194,11 @@ def _run(verb, dir, args, flags) -> dict:
                              context_window=_int(flags, "context", 0))
     if verb == "ask":
         return OPS["ask"](dir, " ".join(args) or flags.get("text") or "")
+    if verb == "tag":
+        return OPS["tag"](dir, brain=_brain(flags),
+                          episode_id=flags.get("episode-id") or flags.get("episode"),
+                          message_id=flags.get("message-id"),
+                          tag=(args[0] if args else flags.get("tag")))
     if verb == "doctor":
         return OPS["doctor"]()
     raise ValueError(f"unhandled verb {verb}")

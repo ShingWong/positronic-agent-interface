@@ -66,6 +66,14 @@ class IngestMailRequest(BaseModel):
     messageId: str = ""
     brain: str | None = None
     attachments: list[dict] = []
+    isHtml: bool = False
+
+
+class TagRequest(BaseModel):
+    brain: str | None = None
+    episode_id: str | None = None
+    message_id: str | None = None
+    tag: str = ""
 
 
 class RecallRequest(BaseModel):
@@ -127,6 +135,16 @@ def ingest(req: IngestMailRequest):
     # Store the body honestly — empty stays empty so the client can warn.
     # The op falls back to subject only for the subject_norm label.
     text = (req.body or "").strip()
+    body_convert = "plain"
+    if req.isHtml and text:
+        try:
+            from positronic_ai.extract.html import html_to_markdown
+            text = html_to_markdown(text).strip()
+            body_convert = "html2text"
+        except Exception:  # noqa: BLE001  (fallback must never fail ingest)
+            import re as _re
+            text = _re.sub(r"<[^>]*>", " ", text).strip()
+            body_convert = "regex-fallback"
     out = _run(PROJECT_DIR, text, brain=brain, kind="message",
                subject=req.subject or None,
                sender=req.sender or None,
@@ -135,7 +153,18 @@ def ingest(req: IngestMailRequest):
                role="assistant")
     out["brain"] = brain
     out["body_chars"] = len(text)
+    out["body_convert"] = body_convert
     return out
+
+
+@app.post("/tag")
+def tag(req: TagRequest):
+    from positronic_ai.ops.tag import run as _run
+    brain = sanitize_brain(req.brain)
+    if not brain:
+        brain = sanitize_brain(os.environ.get("POSITRONIC_MAIL_BRAIN"))
+    return _run(PROJECT_DIR, brain=brain, episode_id=req.episode_id,
+                message_id=req.message_id, tag=req.tag)
 
 
 @app.post("/recall")
