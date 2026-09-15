@@ -16,22 +16,29 @@
 # along with this program. If not, see <https://gnu.org>.
 # =====================================================================
 
-"""HTML -> markdown via system html2text. Markdown is the canonical
-intermediate: one chunker serves HTML and md inputs."""
+"""HTML -> plain text via pandoc. Plain text is the canonical
+intermediate: one chunker serves HTML and md inputs.
+
+Replaced html2text (v0.2): the C++ binary segfaults (munmap_chunk) on
+large marketing HTML, and its markdown-table output confused the table
+detector. Pandoc's plain writer flattens layout tables into aligned
+columns with values intact (verified: Priceline itinerary keeps flights,
+$304.86 totals; 107KB HTML -> 59KB clean text)."""
 import shutil
 import subprocess
 
 
 def _bin() -> str:
-    p = shutil.which("html2text")
+    p = shutil.which("pandoc")
     if not p:
-        raise RuntimeError("html2text not on PATH (apt install html2text)")
+        raise RuntimeError("pandoc not on PATH (apt install pandoc)")
     return p
 
 
 def html_to_markdown(html: str) -> str:
-    r = subprocess.run([_bin(), "-nobs"], input=html, capture_output=True,
-                       text=True, timeout=60, check=False)
+    r = subprocess.run([_bin(), "-f", "html", "-t", "plain", "--wrap=none"],
+                       input=html, capture_output=True,
+                       text=True, timeout=120, check=False)
     if r.returncode != 0:
-        raise RuntimeError(f"html2text failed: {r.stderr[:200]}")
+        raise RuntimeError(f"pandoc failed: {r.stderr[:200]}")
     return r.stdout

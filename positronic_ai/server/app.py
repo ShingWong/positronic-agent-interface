@@ -153,7 +153,7 @@ def ingest(req: IngestMailRequest):
         try:
             from positronic_ai.extract.html import html_to_markdown
             text = html_to_markdown(text).strip()
-            body_convert = "html2text"
+            body_convert = "pandoc-plain"
         except Exception:  # noqa: BLE001  (fallback must never fail ingest)
             import re as _re
             text = _re.sub(r"<[^>]*>", " ", text).strip()
