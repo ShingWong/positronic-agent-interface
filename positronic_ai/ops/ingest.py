@@ -69,8 +69,31 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
                 return {"duplicate": True, "skipped": True, "tau": None}
 
     subj = subject or text[:80]
-    features = {"subject_norm": subj, "body_text": text,
+    body = text
+    vision_used = False
+    vision_error = ""
+    table_sig: dict = {}
+    if kind == "message":
+        from ..vision import detect_table, maybe_restructure, DEFAULT_VISION_URL
+        tbl, table_sig = detect_table(text)
+        features_table = dict(table_sig)
+        if tbl:
+            vurl = (cfg.get("embed") or {}).get("vision_url", DEFAULT_VISION_URL)
+            try:
+                body, vision_used = maybe_restructure(text, vurl)
+            except Exception as ex:  # noqa: BLE001 (vision down: keep raw, FTS still works)
+                vision_error = str(ex)[:200]
+    features = {"subject_norm": subj, "body_text": body,
                 "arousal": arousal, "role": role}
+    # Telemetry: always store table signals so detection can be reviewed
+    # and the threshold refined from real mail (see sam email analysis).
+    if table_sig:
+        features["table_sig"] = table_sig
+    if vision_used:
+        features["vision_restructured"] = True
+        features["body_raw"] = text
+    if vision_error:
+        features["vision_error"] = vision_error
     if sender:
         features["sender"] = str(sender)
     if date:
@@ -84,7 +107,7 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
             "AND json_extract(features_json,'$.sender') = ?",
             (str(sender),)).fetchone()
         from ..threat import score_threat
-        verdict = score_threat(sender, subj, text,
+        verdict = score_threat(sender, subj, body,
                                (hist["c"] if hist else 0))
         features["threat_tag"] = verdict["tag"]
         features["threat_reasons"] = verdict["reasons"]
@@ -92,6 +115,9 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
                           persons=["p_kairos"], wall=datetime.now(timezone.utc),
                           features=features))
     out = {"tau": r.tau, "encoded": bool(r.verdict.encoded), "episode_id": str(r.episode_id)}
+    out["vision_used"] = vision_used
+    if vision_error:
+        out["vision_error"] = vision_error
     emb = getattr(e, "_embedder", None)
     out["embedded"] = bool(emb)
     if not emb:

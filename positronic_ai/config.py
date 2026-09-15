@@ -25,10 +25,12 @@ ALLOWED_EMBEDS = {"lexical", "local", "remote"}
 ENGRAM_TAG = "v0.2.0"
 CONFIG_KEYS = {"profile", "embed", "threshold", "live",
                "local_url", "remote_url", "remote_key", "engram_tag",
+               "vision_url",
                "consolidate_every", "prune_every", "dedup",
                "since_consolidate", "since_prune", "capture_user"}
 _DEFAULT = {"brains": {}, "live": True,
-            "embed": {"local_url": "http://127.0.0.1:8090"}, "engram_tag": ENGRAM_TAG,
+            "embed": {"local_url": "http://127.0.0.1:8090",
+                      "vision_url": "http://127.0.0.1:8080"}, "engram_tag": ENGRAM_TAG,
             "auto": {"consolidate_every": 0, "prune_every": 0},
             "counters": {"since_consolidate": 0, "since_prune": 0},
             "dedup": False, "capture_user": False}
@@ -112,6 +114,8 @@ def set_key(project_dir, key: str, value, *, brain: str | None = None) -> dict:
         cfg["live"] = bool(value)
     elif key == "local_url":
         cfg.setdefault("embed", {})["local_url"] = value
+    elif key == "vision_url":
+        cfg.setdefault("embed", {})["vision_url"] = value
     elif key == "remote_url":
         cfg.setdefault("embed", {})["remote_url"] = value
     elif key == "remote_key":
