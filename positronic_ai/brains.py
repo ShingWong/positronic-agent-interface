@@ -54,9 +54,33 @@ def init_brain(project_dir, name: str, profile: str, embed: str = "lexical", thr
     e.register_domain(name, retention_profile=profile)
     e.attach_stream(f"positronic:{name}", name)
 
+    # Every brain gets a UUID at creation (stable identity; the human
+    # name stays as the label). Existing brains keep working — the UUID
+    # is added on first init that lacks one.
+    import uuid as _uuid
+    brain_uuid = str(_uuid.uuid7() if hasattr(_uuid, "uuid7") else _uuid.uuid4())
+    s.conn.execute(
+        "INSERT OR IGNORE INTO meta(k, v) VALUES('brain_uuid', ?)",
+        (brain_uuid,))
+    s.conn.commit()
+
     # update config
     cfg = load_config(project_dir)
-    cfg["brains"][name] = {"profile": profile, "embed": embed}
+    existing = (cfg.get("brains") or {}).get(name) or {}
+    # Keep a stable UUID: reuse the stored one, else the new DB one.
+    import sqlite3 as _sql
+    stored = existing.get("uuid")
+    if not stored:
+        try:
+            _c = _sql.connect(str(db_path))
+            stored = _c.execute(
+                "SELECT v FROM meta WHERE k='brain_uuid'").fetchone()
+            stored = stored[0] if stored else brain_uuid
+            _c.close()
+        except Exception:  # noqa: BLE001 (fresh DB already has it)
+            stored = brain_uuid
+    cfg["brains"][name] = {"profile": profile, "embed": embed,
+                           "uuid": stored}
     if threshold is not None:
         cfg["brains"][name]["threshold"] = threshold
     save_config(project_dir, cfg)

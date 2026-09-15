@@ -141,7 +141,11 @@ section in `api-spec.md`.
 `.positronic/config.json`:
 
 - Per-brain (`brains.<name>`): `profile` (retention), `embed`
-  (`lexical` \| `local` \| `remote`), `threshold`.
+  (`lexical` \| `local` \| `remote`), `threshold`, `uuid` (stable brain
+  identity, assigned at creation — the name stays as the label).
+- Every brain db also stores `uuid` in its `meta` table plus
+  `brain_version` (format version, starts at 1) beside the existing
+  `schema_version`. Old brains gain them automatically on open.
 - Top-level: `live` (bool), `local_url` (one URL or a failover list),
   `remote_url`, `remote_key`, `engram_tag`.
 - Lifecycle: `auto.consolidate_every`, `auto.prune_every` (episode counts,

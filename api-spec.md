@@ -166,8 +166,14 @@ matching `ops.<verb>.run`.
 
 Env: `POSITRONIC_PROJECT_DIR` (default CWD), `POSITRONIC_SERVER_HOST`
 (default `0.0.0.0`), `POSITRONIC_SERVER_PORT` (default `8080`),
-`POSITRONIC_MAIL_BRAIN` (default brain for mail ingestion when the client
-sends none).
+`POSITRONIC_MAIL_BRAIN` (pins the instance to one brain — see isolation).
+
+**Brain isolation:** when `POSITRONIC_MAIL_BRAIN` is set, the instance
+serves exactly that brain. Client-supplied brain names are ignored on
+every endpoint (`ingest`, `recall`, `query`, `tag`, `brain-test`,
+`info`, `stats`). Mail brains can never cross into each other or
+into session brains like kairos. Manual cross-brain access happens
+only outside the pinned server, with explicit approval.
 
 | Route | Body | Verb |
 |-------|------|------|

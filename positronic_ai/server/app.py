@@ -48,6 +48,24 @@ def sanitize_brain(name) -> str | None:
     return slug or None
 
 
+# Brain isolation: the mail instance serves exactly one brain, named by
+# POSITRONIC_MAIL_BRAIN. When set, every endpoint is pinned to it —
+# client-supplied brain names are ignored, so mail brains can never
+# cross into each other or into session brains like kairos.
+MAIL_BRAIN = sanitize_brain(os.environ.get("POSITRONIC_MAIL_BRAIN"))
+
+
+def resolve_brain(req_brain) -> str | None:
+    """Pin to MAIL_BRAIN when set; else sanitize the client value."""
+    if MAIL_BRAIN:
+        ensure_brain(MAIL_BRAIN)
+        return MAIL_BRAIN
+    brain = sanitize_brain(req_brain)
+    if brain:
+        ensure_brain(brain)
+    return brain
+
+
 def ensure_brain(name: str) -> str:
     """Provision a per-user brain on first use (balanced/lexical)."""
     import pathlib
@@ -126,12 +144,7 @@ def health():
 @app.post("/ingest")
 def ingest(req: IngestMailRequest):
     from positronic_ai.ops.ingest import run as _run
-    brain = sanitize_brain(req.brain)
-    if not brain:
-        # Per-user deployment default: the mail instance serves one user.
-        brain = sanitize_brain(os.environ.get("POSITRONIC_MAIL_BRAIN"))
-    if brain:
-        ensure_brain(brain)
+    brain = resolve_brain(req.brain)
     # Store the body honestly — empty stays empty so the client can warn.
     # The op falls back to subject only for the subject_norm label.
     text = (req.body or "").strip()
@@ -160,9 +173,7 @@ def ingest(req: IngestMailRequest):
 @app.post("/tag")
 def tag(req: TagRequest):
     from positronic_ai.ops.tag import run as _run
-    brain = sanitize_brain(req.brain)
-    if not brain:
-        brain = sanitize_brain(os.environ.get("POSITRONIC_MAIL_BRAIN"))
+    brain = resolve_brain(req.brain)
     return _run(PROJECT_DIR, brain=brain, episode_id=req.episode_id,
                 message_id=req.message_id, tag=req.tag)
 
@@ -170,7 +181,8 @@ def tag(req: TagRequest):
 @app.post("/recall")
 def recall(req: RecallRequest):
     from positronic_ai.ops.recall import run as _run
-    return _run(PROJECT_DIR, req.text, k=req.k, brains=req.brains,
+    brains = [MAIL_BRAIN] if MAIL_BRAIN else req.brains
+    return _run(PROJECT_DIR, req.text, k=req.k, brains=brains,
                 consolidation=req.consolidation,
                 context_window=req.context_window)
 
@@ -178,7 +190,8 @@ def recall(req: RecallRequest):
 @app.post("/query")
 def query(req: QueryRequest):
     from positronic_ai.ops.query import run as _run
-    return _run(PROJECT_DIR, brain=req.brain, text=req.text, sql=req.sql,
+    brain = MAIL_BRAIN or req.brain
+    return _run(PROJECT_DIR, brain=brain, text=req.text, sql=req.sql,
                 cue=req.cue, objects=req.objects, anchors=req.anchors,
                 sightings=req.sightings, k=req.k,
                 consolidation=req.consolidation,
@@ -194,18 +207,26 @@ def ask(req: AskRequest):
 @app.post("/brain-test")
 def brain_test(req: BrainTestRequest):
     from positronic_ai.ops.brain_test import run as _run
-    return _run(PROJECT_DIR, brain=req.brain, k=req.k)
+    return _run(PROJECT_DIR, brain=MAIL_BRAIN or req.brain, k=req.k)
 
 
 @app.get("/info")
 def info():
     from positronic_ai.ops.info import run as _run
-    return _run(PROJECT_DIR)
+    out = _run(PROJECT_DIR)
+    if MAIL_BRAIN:
+        # Pinned instance: disclose only the served brain.
+        brains = out.get("brains") or {}
+        if MAIL_BRAIN in brains:
+            out["brains"] = {MAIL_BRAIN: brains[MAIL_BRAIN]}
+    return out
 
 
 @app.get("/stats")
 def stats():
     from positronic_ai.ops.stats import run as _run
+    if MAIL_BRAIN:
+        return _run(PROJECT_DIR, brain=MAIL_BRAIN)
     return _run(PROJECT_DIR)
 
 

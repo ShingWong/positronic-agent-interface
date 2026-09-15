@@ -98,7 +98,17 @@ def init_run(dir, *, brains=None, force=False, live=None,
     new_brains = {}
     for a in answers:
         init_brain(dir, a["name"], a["profile"], a["embed"])
-        new_brains[a["name"]] = {"profile": a["profile"], "embed": a["embed"]}
+        import sqlite3 as _sql
+        try:
+            _c = _sql.connect(str(Path(dir) / ".positronic" / "brains"
+                                  / a["name"] / "memory.db"))
+            _u = _c.execute(
+                "SELECT v FROM meta WHERE k='brain_uuid'").fetchone()
+            _c.close()
+        except Exception:  # noqa: BLE001 (init_brain already wrote it)
+            _u = None
+        new_brains[a["name"]] = {"profile": a["profile"], "embed": a["embed"],
+                                 "uuid": (_u[0] if _u else None)}
 
     try:
         existing_cfg = load_config(dir)
