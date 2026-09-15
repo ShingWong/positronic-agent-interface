@@ -24,6 +24,13 @@ positronic init --brain mail --profile long_term --embed local
 positronic config local_url http://<host>:8090    # default http://127.0.0.1:8090
 ```
 
+`local_url` also takes a list for failover (tried in order, first answer
+wins; comma or space separated):
+
+```bash
+positronic config local_url "http://bge1:8090, http://bge2:8090"
+```
+
 `remote` is API-key-style hosted embedding only (`embed.remote_url` +
 `embed.remote_key` in `.positronic/config.json`; `config` masks the key without
 `--show-secrets`). As of this release no embedder binds for `remote` brains —

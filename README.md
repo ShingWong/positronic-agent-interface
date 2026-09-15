@@ -142,8 +142,8 @@ section in `api-spec.md`.
 
 - Per-brain (`brains.<name>`): `profile` (retention), `embed`
   (`lexical` \| `local` \| `remote`), `threshold`.
-- Top-level: `live` (bool), `local_url`, `remote_url`, `remote_key`,
-  `engram_tag`.
+- Top-level: `live` (bool), `local_url` (one URL or a failover list),
+  `remote_url`, `remote_key`, `engram_tag`.
 - Lifecycle: `auto.consolidate_every`, `auto.prune_every` (episode counts,
   `0` = disabled — the default), `counters.since_consolidate`,
   `counters.since_prune` (running tallies), `dedup` (bool, skip exact-repeat
