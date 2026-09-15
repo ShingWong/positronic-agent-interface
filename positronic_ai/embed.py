@@ -39,17 +39,31 @@ class _TooLarge(Exception):
 
 def _post_embedding(text: str, url: str, timeout: int = 180) -> list[float]:
     body = json.dumps({"content": text}).encode()
-    req = urllib.request.Request(url.rstrip("/") + "/embedding", data=body,
-                                 headers={"Content-Type": "application/json"})
-    try:
-        d = json.loads(urllib.request.urlopen(req, timeout=timeout).read())
-        emb = d[0]["embedding"]
-        return emb[0] if isinstance(emb[0], list) else emb
-    except urllib.error.HTTPError as e:
-        msg = e.read()[:300].decode("utf-8", "replace")
-        if e.code == 500 and _SIZE_ERR in msg:
-            raise _TooLarge(msg) from None
-        raise RuntimeError(f"embedding HTTP {e.code}: {msg}") from None
+    last_err: Exception | None = None
+    for u in _as_url_list(url):
+        req = urllib.request.Request(u.rstrip("/") + "/embedding", data=body,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            d = json.loads(urllib.request.urlopen(req, timeout=timeout).read())
+            emb = d[0]["embedding"]
+            return emb[0] if isinstance(emb[0], list) else emb
+        except urllib.error.HTTPError as e:
+            msg = e.read()[:300].decode("utf-8", "replace")
+            if e.code == 500 and _SIZE_ERR in msg:
+                raise _TooLarge(msg) from None
+            last_err = RuntimeError(f"embedding HTTP {e.code}: {msg}")
+            continue
+        except Exception as e:  # noqa: BLE001 (try next URL)
+            last_err = e
+            continue
+    raise RuntimeError(f"embedding failed on all urls: {last_err}") from None
+
+
+def _as_url_list(url) -> list[str]:
+    """Accept one URL or a list; split strings on comma/space."""
+    if isinstance(url, (list, tuple)):
+        return [str(u).strip() for u in url if str(u).strip()]
+    return [u for u in str(url).replace(",", " ").split() if u]
 
 
 def _halve(text: str) -> tuple[str, str]:
