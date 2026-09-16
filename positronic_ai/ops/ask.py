@@ -32,12 +32,14 @@ from ..objects import object_sightings, resolve_object
 log = logging.getLogger(__name__)
 
 
-def run(dir, object_name) -> dict:
+def run(dir, object_name, *, brains=None) -> dict:
     """Look up an object dossier across brains; {object, sightings, found}."""
     if not (object_name or "").strip():
         return {"object": None, "sightings": [], "found": False}
     cfg = load_config(dir)
-    for name in cfg.get("brains", {}):
+    names = [b for b in (brains or list(cfg.get("brains", {})))
+             if b in cfg.get("brains", {})]
+    for name in names:
         db = Path(dir) / ".positronic" / "brains" / name / "memory.db"
         if not db.exists():
             continue

@@ -50,9 +50,10 @@ _DIGEST_SQL = ("SELECT COUNT(*) AS sighting_count, "
 def resolve_object(store, object_name: str) -> dict | None:
     """Fuzzy object lookup; returns the object row dict or None.
 
-    Matches the exact name, a substring, or a hyphen/underscore-normalized
-    variant (entity extraction hyphenates 'opencode plugin'; agents cue with
-    spaces). Exact match ranks first.
+    Matches the exact name, a word-boundary substring, or a
+    hyphen/underscore-normalized variant (entity extraction hyphenates
+    'opencode plugin'; agents cue with spaces). Exact match ranks first.
+    Mid-word substrings never match ('shing' must not hit 'bashing').
     """
     object_name = (object_name or "").strip()
     if not object_name:
@@ -61,7 +62,18 @@ def resolve_object(store, object_name: str) -> dict | None:
     row = store.conn.execute(
         _OBJECT_SQL,
         (object_name, like, like, object_name)).fetchone()
-    return dict(row) if row else None
+    if row is None:
+        return None
+    hit = dict(row)
+    if hit["canonical_name"] == object_name:
+        return hit
+    import re as _re
+    boundary = _re.compile(r"(^|[\s\-_])" + _re.escape(object_name),
+                           _re.IGNORECASE)
+    norm = hit["canonical_name"].replace("-", " ").replace("_", " ")
+    if boundary.search(hit["canonical_name"]) or boundary.search(norm):
+        return hit
+    return None
 
 def object_sightings(store, object_id: str) -> list[dict]:
     """Full τ-ordered dossier for one object (dig-deeper payload)."""

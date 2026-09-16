@@ -202,6 +202,8 @@ def query(req: QueryRequest):
 @app.post("/ask")
 def ask(req: AskRequest):
     from positronic_ai.ops.ask import run as _run
+    if MAIL_BRAIN:
+        return _run(PROJECT_DIR, req.object_name, brains=[MAIL_BRAIN])
     return _run(PROJECT_DIR, req.object_name)
 
 
