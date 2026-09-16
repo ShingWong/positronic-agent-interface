@@ -101,6 +101,7 @@ class RecallRequest(BaseModel):
     consolidation: str | None = None
     context_window: int = 0
     threat: str | None = None
+    exhaustive: bool = False
 
 
 class QueryRequest(BaseModel):
@@ -185,7 +186,8 @@ def recall(req: RecallRequest):
     brains = [MAIL_BRAIN] if MAIL_BRAIN else req.brains
     return _run(PROJECT_DIR, req.text, k=req.k, brains=brains,
                 consolidation=req.consolidation,
-                context_window=req.context_window, threat=req.threat)
+                context_window=req.context_window, threat=req.threat,
+                exhaustive=req.exhaustive)
 
 
 @app.post("/query")

@@ -34,12 +34,16 @@ log = logging.getLogger(__name__)
 
 
 def run(dir, text, *, k=8, brains=None, consolidation=None,
-        context_window=0, threat=None) -> dict:
+        context_window=0, threat=None, exhaustive=False) -> dict:
     """Fuse per-brain activate hits; {results: [...], object?: {versions}}.
 
     threat='flagged' (any non-clean tag) or a single tag name bypasses
     lexical ranking and lists flagged episodes newest-first — lexical
     recall cannot find threat tags (they live in features, not text).
+
+    exhaustive=True answers "all X" requests: FTS match over subject+body
+    for the cue keywords, newest-first, up to k. No ranking cutoff —
+    every match comes back.
 
     When the cue fuzzy-matches an object, a compact polytemporal digest
     (versions) is attached — the agent decides how deep to dig (ask reveals
@@ -65,6 +69,9 @@ def run(dir, text, *, k=8, brains=None, consolidation=None,
             continue
         if threat:
             _merge_threat_hits(dir, name, db, threat, k, ranked)
+            continue
+        if exhaustive:
+            _merge_exhaustive_hits(dir, name, db, text, k, ranked)
             continue
         try:
             _s, e = open_engine(dir, name)
@@ -92,11 +99,98 @@ def run(dir, text, *, k=8, brains=None, consolidation=None,
         results.append(hit)
     results.sort(key=lambda h: -h["rrf_score"])
     out: dict = {"results": results[:k]}
+    if not threat and not exhaustive:
+        # Ranked mode discloses coverage: top-k of how many FTS matches.
+        out["total"] = sum(
+            _fts_count(Path(dir) / ".positronic" / "brains" / n / "memory.db", text)
+            for n in names
+            if (Path(dir) / ".positronic" / "brains" / n / "memory.db").exists())
+    else:
+        out["total"] = len(results)
 
     obj = _resolve_any(dir, names, text)
     if obj is not None:
         out["object"] = obj
     return out
+
+
+_STOPWORDS = frozenset(
+    "all every list give me the a an of for to show find get please".split())
+
+
+def _fts_or_query(text: str) -> str:
+    """Keyword OR query for FTS5: strip stopwords/punctuation, quote terms.
+
+    FTS5 does no stemming, so plural cues miss singular bodies ("invoices"
+    vs "invoice"). Each term also contributes a prefix alternative on the
+    de-pluralized stem — exhaustive mode over-includes by design.
+    """
+    import re as _re
+    terms = [t for t in _re.findall(r"[A-Za-z0-9]+", (text or "").lower())
+             if t not in _STOPWORDS and len(t) > 1]
+    alts = []
+    for t in terms:
+        alts.append(f'"{t}"')
+        stem = _re.sub(r"(ies|es|s)$", "", t)
+        if len(stem) >= 3 and stem != t:
+            alts[-1] += f" OR {stem}*"
+        elif len(t) >= 4:
+            alts[-1] += f" OR {t}*"
+    return " OR ".join(alts)
+
+
+def _fts_count(db, text) -> int:
+    """Total FTS matches for the cue (disclosure: top-k of total)."""
+    import sqlite3
+    q = _fts_or_query(text)
+    if not q:
+        return 0
+    try:
+        c = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        n = c.execute("SELECT COUNT(*) FROM episode_fts "
+                      "WHERE episode_fts MATCH ?", (q,)).fetchone()[0]
+        c.close()
+        return int(n)
+    except Exception:  # noqa: BLE001 — count is advisory, never fatal
+        return 0
+
+
+def _merge_exhaustive_hits(dir, name, db, text, k, ranked) -> None:
+    """Every FTS match for the cue keywords, newest-first (no ranking)."""
+    import sqlite3
+    q = _fts_or_query(text)
+    if not q:
+        return
+    c = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    c.row_factory = sqlite3.Row
+    try:
+        rows = c.execute(
+            "SELECT e.id, e.features_json, e.tau, e.wall "
+            "FROM episode_fts f JOIN episode e ON e.id = f.id "
+            "WHERE episode_fts MATCH ? "
+            "ORDER BY e.tau DESC LIMIT ?", (q, k)).fetchall()
+        for i, row in enumerate(rows):
+            try:
+                feats = json.loads(row["features_json"] or "{}")
+            except ValueError:
+                feats = {}
+            eid = row["id"]
+            merged = ranked.setdefault(eid, {})
+            merged["rrf_score"] = merged.get("rrf_score", 0.0) + 1.0 / (60.0 + i)
+            merged.update({
+                "brain": name,
+                "episode_id": eid,
+                "subject": feats.get("subject_norm") or "",
+                "snippet": (feats.get("body_text") or "")[:200],
+                "message_id": feats.get("message_id") or "",
+                "sender": feats.get("sender") or "",
+                "threat_tag": feats.get("threat_tag") or "clean",
+                "threat_reasons": feats.get("threat_reasons") or [],
+                "tau": row["tau"],
+                "wall": row["wall"],
+            })
+    finally:
+        c.close()
 
 
 def _merge_threat_hits(dir, name, db, threat, k, ranked) -> None:
@@ -116,7 +210,7 @@ def _merge_threat_hits(dir, name, db, threat, k, ranked) -> None:
             )
             params = (threat,)
         rows = c.execute(
-            "SELECT id, features_json, tau FROM episode "
+            "SELECT id, features_json, tau, wall FROM episode "
             f"WHERE kind='message' AND {cond} "
             "ORDER BY tau DESC LIMIT ?", (*params, k)).fetchall()
         for i, row in enumerate(rows):
@@ -137,6 +231,7 @@ def _merge_threat_hits(dir, name, db, threat, k, ranked) -> None:
                 "threat_tag": feats.get("threat_tag") or "clean",
                 "threat_reasons": feats.get("threat_reasons") or [],
                 "tau": row["tau"],
+                "wall": row["wall"],
             })
     finally:
         c.close()
