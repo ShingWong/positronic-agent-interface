@@ -135,6 +135,7 @@ def _merge_threat_hits(dir, name, db, threat, k, ranked) -> None:
                 "message_id": feats.get("message_id") or "",
                 "sender": feats.get("sender") or "",
                 "threat_tag": feats.get("threat_tag") or "clean",
+                "threat_reasons": feats.get("threat_reasons") or [],
                 "tau": row["tau"],
             })
     finally:
