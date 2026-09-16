@@ -38,7 +38,7 @@ def normalize_message_id(raw) -> str:
 
 def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
         dedup=None, role="assistant", sender=None, date=None,
-        message_id=None, threat=True) -> dict:
+        message_id=None, threat=True, attachment_names=None) -> dict:
     cfg = load_config(dir)
     if cfg.get("live") is False and kind == "message":
         return {"encoded": False, "reason": "live=false"}
@@ -100,6 +100,8 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
         features["date"] = str(date)
     if mid:
         features["message_id"] = mid
+    if attachment_names:
+        features["attachments"] = list(attachment_names)
     verdict = {"tag": "clean", "reasons": []}
     if threat and kind == "message" and sender:
         hist = s.conn.execute(

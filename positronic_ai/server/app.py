@@ -160,15 +160,47 @@ def ingest(req: IngestMailRequest):
             import re as _re
             text = _re.sub(r"<[^>]*>", " ", text).strip()
             body_convert = "regex-fallback"
+    # Attachments: extract text server-side (pdf/office via pandoc),
+    # append under filename headers. Never fails the ingest.
+    attach_text, attach_names = "", []
+    for att in (req.attachments or [])[:3]:
+        try:
+            import base64 as _b64
+
+            from positronic_ai.extract.attach import _extract_by_ext, _extension
+            raw = att.get("data") or ""
+            try:
+                data = _b64.b64decode(raw, validate=False)
+                # Heuristic: genuine base64 of binary decodes to non-text.
+                if len(data) < len(raw) // 2:
+                    raise ValueError("short decode — treat as text")
+            except Exception:  # noqa: BLE001 — fall back to raw text bytes
+                data = raw.encode("utf-8", "replace")
+            if len(data) > 8 * 1024 * 1024:
+                continue
+            fname = att.get("filename") or "attachment"
+            md = _extract_by_ext(data, _extension(fname), fname)
+            if md and md.strip():
+                attach_names.append(fname)
+                attach_text += f"\n\n[Attachment: {fname}]\n{md.strip()}"
+        except Exception:  # noqa: BLE001 — one bad part never kills mail
+            continue
+    if attach_text:
+        text = (text + "\n" + attach_text.strip()).strip()
+        body_convert += "+attach"
     out = _run(PROJECT_DIR, text, brain=brain, kind="message",
                subject=req.subject or None,
                sender=req.sender or None,
                date=req.date or None,
                message_id=req.messageId or None,
-               role="assistant")
+               role="assistant",
+               attachment_names=[a.get("filename", "") for a in (req.attachments or []) if a.get("filename")])
     out["brain"] = brain
     out["body_chars"] = len(text)
     out["body_convert"] = body_convert
+    if attach_text:
+        out["attachments_extracted"] = attach_names
+        out["attach_chars"] = len(attach_text)
     return out
 
 
