@@ -22,6 +22,7 @@ Public-safe: touches only `.positronic/brains/*` (never the private
 kairos_brain). Per-brain `activate` hits are merged with reciprocal-rank
 fusion (RRF); each hit is tagged with its source brain.
 """
+import json
 import logging
 from pathlib import Path
 
@@ -33,8 +34,12 @@ log = logging.getLogger(__name__)
 
 
 def run(dir, text, *, k=8, brains=None, consolidation=None,
-        context_window=0) -> dict:
+        context_window=0, threat=None) -> dict:
     """Fuse per-brain activate hits; {results: [...], object?: {versions}}.
+
+    threat='flagged' (any non-clean tag) or a single tag name bypasses
+    lexical ranking and lists flagged episodes newest-first — lexical
+    recall cannot find threat tags (they live in features, not text).
 
     When the cue fuzzy-matches an object, a compact polytemporal digest
     (versions) is attached — the agent decides how deep to dig (ask reveals
@@ -44,7 +49,7 @@ def run(dir, text, *, k=8, brains=None, consolidation=None,
     (reunites premise+answer split by per-message chunking).
     """
     text = (text or "").strip()
-    if not text:
+    if not text and not threat:
         return {"results": []}
     cfg = load_config(dir)
     all_brains = cfg.get("brains", {})
@@ -57,6 +62,9 @@ def run(dir, text, *, k=8, brains=None, consolidation=None,
     for name in names:
         db = Path(dir) / ".positronic" / "brains" / name / "memory.db"
         if not db.exists():
+            continue
+        if threat:
+            _merge_threat_hits(dir, name, db, threat, k, ranked)
             continue
         try:
             _s, e = open_engine(dir, name)
@@ -89,6 +97,48 @@ def run(dir, text, *, k=8, brains=None, consolidation=None,
     if obj is not None:
         out["object"] = obj
     return out
+
+
+def _merge_threat_hits(dir, name, db, threat, k, ranked) -> None:
+    """List flagged episodes newest-first (no lexical ranking)."""
+    import sqlite3
+    c = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    c.row_factory = sqlite3.Row
+    try:
+        if threat == "flagged":
+            cond = ("COALESCE(json_extract(features_json,'$.threat_tag'),"
+                    "'clean') != 'clean'")
+            params: tuple = ()
+        else:
+            cond = (
+                "COALESCE(json_extract(features_json,'$.threat_tag'),"
+                "'clean') = ?"
+            )
+            params = (threat,)
+        rows = c.execute(
+            "SELECT id, features_json, tau FROM episode "
+            f"WHERE kind='message' AND {cond} "
+            "ORDER BY tau DESC LIMIT ?", (*params, k)).fetchall()
+        for i, row in enumerate(rows):
+            try:
+                feats = json.loads(row["features_json"] or "{}")
+            except ValueError:
+                feats = {}
+            eid = row["id"]
+            merged = ranked.setdefault(eid, {})
+            merged["rrf_score"] = merged.get("rrf_score", 0.0) + 1.0 / (60.0 + i)
+            merged.update({
+                "brain": name,
+                "episode_id": eid,
+                "subject": feats.get("subject_norm") or "",
+                "snippet": (feats.get("body_text") or "")[:200],
+                "message_id": feats.get("message_id") or "",
+                "sender": feats.get("sender") or "",
+                "threat_tag": feats.get("threat_tag") or "clean",
+                "tau": row["tau"],
+            })
+    finally:
+        c.close()
 
 
 def _resolve_any(project_dir, names, text) -> dict | None:

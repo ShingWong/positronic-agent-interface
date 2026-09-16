@@ -95,11 +95,12 @@ class TagRequest(BaseModel):
 
 
 class RecallRequest(BaseModel):
-    text: str
+    text: str = ""
     k: int = 8
     brains: list[str] | None = None
     consolidation: str | None = None
     context_window: int = 0
+    threat: str | None = None
 
 
 class QueryRequest(BaseModel):
@@ -184,7 +185,7 @@ def recall(req: RecallRequest):
     brains = [MAIL_BRAIN] if MAIL_BRAIN else req.brains
     return _run(PROJECT_DIR, req.text, k=req.k, brains=brains,
                 consolidation=req.consolidation,
-                context_window=req.context_window)
+                context_window=req.context_window, threat=req.threat)
 
 
 @app.post("/query")
@@ -250,6 +251,12 @@ def vitals():
         if db.exists():
             out["db_mb"] = round(db.stat().st_size / 1048576, 1)
             c = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+            try:
+                uuid_row = c.execute(
+                    "SELECT v FROM meta WHERE k='brain_uuid'").fetchone()
+            except Exception:  # noqa: BLE001 — old brains may lack meta
+                uuid_row = None
+            out["uuid"] = uuid_row[0] if uuid_row else ""
             out["episodes"] = c.execute(
                 "SELECT COUNT(*) FROM episode").fetchone()[0]
             out["vision_fires"] = c.execute(
