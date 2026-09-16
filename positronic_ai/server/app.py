@@ -230,6 +230,46 @@ def stats():
     return _run(PROJECT_DIR)
 
 
+@app.get("/vitals")
+def vitals():
+    """Dashboard vitals: message count, db size, vision fires, threat
+    breakdown, archive space. One call feeds the Thunderbird dashboard."""
+    import contextlib
+    import shutil
+    import sqlite3
+    from pathlib import Path
+
+    from positronic_ai.ops.stats import run as _stats
+    brain = MAIL_BRAIN
+    out: dict = {"brain": brain, "episodes": 0, "db_mb": 0.0,
+                 "vision_fires": 0, "threats": {}, "archive": {}}
+    if not brain:
+        return out
+    db = Path(PROJECT_DIR) / ".positronic" / "brains" / brain / "memory.db"
+    with contextlib.suppress(Exception):  # vitals never fail the dashboard
+        if db.exists():
+            out["db_mb"] = round(db.stat().st_size / 1048576, 1)
+            c = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+            out["episodes"] = c.execute(
+                "SELECT COUNT(*) FROM episode").fetchone()[0]
+            out["vision_fires"] = c.execute(
+                "SELECT COUNT(*) FROM episode WHERE "
+                "json_extract(features_json,'$.vision_restructured')=1"
+            ).fetchone()[0]
+            for tag, n in c.execute(
+                    "SELECT COALESCE(json_extract(features_json,'$.threat_tag'),"
+                    "'clean'), COUNT(*) FROM episode GROUP BY 1"):
+                out["threats"][tag or "clean"] = n
+            c.close()
+    with contextlib.suppress(Exception):
+        du = shutil.disk_usage(str(db.parent) if db.exists() else PROJECT_DIR)
+        out["archive"] = {"total_gb": round(du.total / 1073741824, 1),
+                          "free_gb": round(du.free / 1073741824, 1)}
+    with contextlib.suppress(Exception):
+        out["server"] = _stats(PROJECT_DIR, brain=brain)["brains"].get(brain, {})
+    return out
+
+
 def main():
     uvicorn.run(app, host=SERVER_HOST, port=SERVER_PORT,
                 log_level="info")
