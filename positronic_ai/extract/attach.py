@@ -43,6 +43,44 @@ from .office import office_to_markdown
 _IMAGE_MIMES = {"image/png", "image/jpeg", "image/jpg", "image/gif",
                 "image/tiff", "image/bmp", "image/webp"}
 
+# Max image dimension (long edge) sent to the vision endpoint. Larger
+# images are downscaled in-memory (cv2, no file I/O) — Qwen-VL wastes
+# VRAM and time on full-res mail attachments with no accuracy gain.
+VISION_MAX_EDGE = 1536
+
+
+def downscale_image(data: bytes, max_edge: int = VISION_MAX_EDGE) -> bytes:
+    """Downscale encoded image bytes so the long edge <= max_edge.
+
+    In-memory via cv2.imdecode/imencode — no file I/O. Already-small
+    images and undecodable input pass through unchanged (never fail
+    the pipeline on a resize).
+    """
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        return data
+    try:
+        arr = np.frombuffer(data, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            return data
+        h, w = img.shape[:2]
+        long_edge = max(h, w)
+        if long_edge <= max_edge:
+            return data
+        scale = max_edge / long_edge
+        small = cv2.resize(img, (int(w * scale), int(h * scale)),
+                           interpolation=cv2.INTER_AREA)
+        ok, buf = cv2.imencode(".jpg", small,
+                               [cv2.IMWRITE_JPEG_QUALITY, 88])
+        if not ok:
+            return data
+        return buf.tobytes()
+    except Exception:  # noqa: BLE001 — resize never kills ingest
+        return data
+
 
 def _extension(filename: str) -> str:
     return Path(filename.lower()).suffix.lstrip(".") or "bin"
@@ -163,7 +201,11 @@ def _extract_by_ext(data: bytes, ext: str, fname: str):
             return f"zip listing error: {ex}"
     if ext in ("png", "jpg", "jpeg", "gif", "tiff", "bmp", "webp"):
         size = len(data)
-        return f"<image {fname} {size}B — vision gated on Qwen-VL :8080 (down)>"
+        small = downscale_image(data)
+        if len(small) != size:
+            return (f"<image {fname} {size}B -> {len(small)}B downscaled "
+                    f"to {VISION_MAX_EDGE}px — vision gated on Qwen-VL :8080>")
+        return f"<image {fname} {size}B — vision gated on Qwen-VL :8080>"
     if ext in ("wav", "mp3", "mp4", "mpg", "mpeg"):
         return None
     return None
