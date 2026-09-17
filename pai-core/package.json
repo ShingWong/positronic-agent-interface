@@ -1,0 +1,24 @@
+{
+  "name": "@positronic/pai-core",
+  "version": "0.1.0",
+  "description": "Portable PAI core: chunk, threat, table-detect, message-id. Plain TS, no deps. Hosts provide storage (sqlite-wasm + OPFS) and transport.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "@sqlite.org/sqlite-wasm": "^3.53.4-build1"
+  }
+}
