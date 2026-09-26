@@ -23,16 +23,18 @@
 # =====================================================================
 
 """Chunked embedding against llama.cpp bge-m3 (:8090). Single requests cap
-at ~2048 tokens (measured HTTP 500 'too large to process'): pre-split into
-~1200-token chunks, mean-pool to one vector (schema keeps single body_embed),
-halve-and-resend ONLY on the size-error message, bounded retries, loud
-failure (never silent — the old best-effort swallow hid FTS-only episodes).
+at ~7500 tokens (CEIL_TOKENS mirrors the server's physical batch of 8192 —
+raising the batch in /etc/llama-bge.config moved the old HTTP 500 'too large
+to process' wall from 2048): pre-split into ~1200-token chunks, mean-pool to
+one vector (schema keeps single body_embed), halve-and-resend ONLY on the
+size-error message, bounded retries, loud failure (never silent — the old
+best-effort swallow hid FTS-only episodes).
 """
 import json
 import urllib.error
 import urllib.request
 
-CEIL_TOKENS = 2048
+CEIL_TOKENS = 7500
 CHUNK_TOKENS = 1200
 CHARS_PER_TOKEN = 6
 MAX_HALVINGS = 4

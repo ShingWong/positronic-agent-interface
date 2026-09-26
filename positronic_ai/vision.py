@@ -149,7 +149,7 @@ def restructure_table(text: str, url: str, timeout: int = 300) -> str:
     body = json.dumps({
         "messages": [{"role": "user",
                       "content": _TABLE_PROMPT + text}],
-        "max_tokens": 2000,
+        "max_tokens": 4096,
         "temperature": 0,
     }).encode()
     last_err: Exception | None = None
