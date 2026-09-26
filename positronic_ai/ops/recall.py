@@ -2,17 +2,23 @@
 # Project Positronic — Polytemporal Cognitive Engram Memory Substrate
 # Copyright (C) 2026 Shing Wong. All Rights Reserved.
 # =====================================================================
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# This program is DUAL-LICENSED. You may redistribute and/or modify it 
+# under the terms of the GNU Affero General Public License as published by the 
+# Free Software Foundation, either version 3 of the License, or (at your 
+# option) any later version.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
+# Alternatively, commercial entities, multi-tenant instances, and Managed 
+# Service Providers (MSPs) may utilize this program under a separate, 
+# proprietary Commercial License Waiver issued directly by the copyright 
+# holder, completely exempt from the network-use copyleft restrictions of 
+# the AGPLv3 Section 13.
 #
-# You should have received a copy of the GNU General Public License
+# This program is distributed in the hope that it will be useful, but 
+# WITHOUT ANY WARRANTY; without even the implied warranty of 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License 
 # along with this program. If not, see <https://gnu.org>.
 # =====================================================================
 
@@ -155,6 +161,17 @@ def _fts_count(db, text) -> int:
         return 0
 
 
+def _kind_snippet(row, feats) -> str:
+    """Attachment extraction text is dense — line items live past the
+    normal window, so attachment hits carry the wider slice."""
+    body = feats.get("body_text") or ""
+    try:
+        kind = row["kind"]
+    except (KeyError, IndexError, TypeError):
+        kind = "message"
+    return body[:2000] if kind == "attachment" else body[:200]
+
+
 def _merge_exhaustive_hits(dir, name, db, text, k, ranked) -> None:
     """Every FTS match for the cue keywords, newest-first (no ranking)."""
     import sqlite3
@@ -165,7 +182,7 @@ def _merge_exhaustive_hits(dir, name, db, text, k, ranked) -> None:
     c.row_factory = sqlite3.Row
     try:
         rows = c.execute(
-            "SELECT e.id, e.features_json, e.tau, e.wall "
+            "SELECT e.id, e.kind, e.features_json, e.tau, e.wall "
             "FROM episode_fts f JOIN episode e ON e.id = f.id "
             "WHERE episode_fts MATCH ? "
             "ORDER BY e.tau DESC LIMIT ?", (q, k)).fetchall()
@@ -181,7 +198,8 @@ def _merge_exhaustive_hits(dir, name, db, text, k, ranked) -> None:
                 "brain": name,
                 "episode_id": eid,
                 "subject": feats.get("subject_norm") or "",
-                "snippet": (feats.get("body_text") or "")[:200],
+                "snippet": _kind_snippet(row, feats),
+                "kind": row["kind"] if "kind" in row.keys() else "message",
                 "message_id": feats.get("message_id") or "",
                 "sender": feats.get("sender") or "",
                 "threat_tag": feats.get("threat_tag") or "clean",
@@ -210,7 +228,7 @@ def _merge_threat_hits(dir, name, db, threat, k, ranked) -> None:
             )
             params = (threat,)
         rows = c.execute(
-            "SELECT id, features_json, tau, wall FROM episode "
+            "SELECT id, kind, features_json, tau, wall FROM episode "
             f"WHERE kind='message' AND {cond} "
             "ORDER BY tau DESC LIMIT ?", (*params, k)).fetchall()
         for i, row in enumerate(rows):
@@ -225,7 +243,8 @@ def _merge_threat_hits(dir, name, db, threat, k, ranked) -> None:
                 "brain": name,
                 "episode_id": eid,
                 "subject": feats.get("subject_norm") or "",
-                "snippet": (feats.get("body_text") or "")[:200],
+                "snippet": _kind_snippet(row, feats),
+                "kind": row["kind"] if "kind" in row.keys() else "message",
                 "message_id": feats.get("message_id") or "",
                 "sender": feats.get("sender") or "",
                 "threat_tag": feats.get("threat_tag") or "clean",

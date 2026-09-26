@@ -1,5 +1,5 @@
 <!--
-Licensed under the GNU General Public License, version 3 or later (GPL-3.0-or-later).
+Licensed under AGPL-3.0-or-later OR Commercial (GNU Affero GPL v3 or a commercial waiver).
 Copyright (C) 2026 Shing Wong. All Rights Reserved.
 See LICENSE for the full license text.
 -->
@@ -46,8 +46,8 @@ pytest -q                # testpaths = ["tests"]; memeng + PAI editable-installe
 ruff check positronic_ai/ tests/
 ```
 
-Every `.py` file carries the GPL-3.0-or-later header; `pyproject.toml` carries
-`license = "GPL-3.0-or-later"`. No MCP anywhere.
+Every `.py` file carries the AGPL dual-license header; `pyproject.toml` carries
+`license = "AGPL-3.0-or-later OR Commercial"`. No MCP anywhere.
 
 ## Note
 

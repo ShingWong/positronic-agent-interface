@@ -1,3 +1,27 @@
+// =====================================================================
+// Project Positronic — Polytemporal Cognitive Engram Memory Substrate
+// Copyright (C) 2026 Shing Wong. All Rights Reserved.
+// =====================================================================
+// This program is DUAL-LICENSED. You may redistribute and/or modify it 
+// under the terms of the GNU Affero General Public License as published by the 
+// Free Software Foundation, either version 3 of the License, or (at your 
+// option) any later version.
+//
+// Alternatively, commercial entities, multi-tenant instances, and Managed 
+// Service Providers (MSPs) may utilize this program under a separate, 
+// proprietary Commercial License Waiver issued directly by the copyright 
+// holder, completely exempt from the network-use copyleft restrictions of 
+// the AGPLv3 Section 13.
+//
+// This program is distributed in the hope that it will be useful, but 
+// WITHOUT ANY WARRANTY; without even the implied warranty of 
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+// Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License 
+// along with this program. If not, see <https://gnu.org>.
+// =====================================================================
+
 // pai-core compose — prefetch context for drafting email.
 //
 // Drafting needs facts BEFORE writing: who the correspondent is (dossier)
@@ -12,8 +36,13 @@ You NEVER invent facts about the correspondent or the thread. Before
 calling compose_email, call compose_context with every recipient and,
 for replies, the message being answered. Every claim in the draft
 (commitments, amounts, dates, names) must come from the prefetched
-dossier or thread episodes. Match the thread's tone. If prefetch returns
-nothing, say so in the draft-free reply and ask the user — do not guess.
+dossier or thread episodes. Match the thread's tone. When a contact
+lookup fails or a detail is missing (address, amount, date,
+confirmation), search the brain next — recall_brain and ask_brain hold
+addresses, amounts, dates, and payment confirmations from mail. Ask the
+user only for what neither contacts, prefetch, nor the brain can
+supply. If prefetch returns nothing, say so in the draft-free reply
+and ask the user — do not guess.
 Sending is a separate, user-confirmed step; composing never sends.`;
 
 export const COMPOSE_CONTEXT_TOOL_DEF: PositronicToolDef = {

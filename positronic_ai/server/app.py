@@ -2,17 +2,23 @@
 # Project Positronic — Polytemporal Cognitive Engram Memory Substrate
 # Copyright (C) 2026 Shing Wong. All Rights Reserved.
 # =====================================================================
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License, published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# This program is DUAL-LICENSED. You may redistribute and/or modify it 
+# under the terms of the GNU Affero General Public License as published by the 
+# Free Software Foundation, either version 3 of the License, or (at your 
+# option) any later version.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
+# Alternatively, commercial entities, multi-tenant instances, and Managed 
+# Service Providers (MSPs) may utilize this program under a separate, 
+# proprietary Commercial License Waiver issued directly by the copyright 
+# holder, completely exempt from the network-use copyleft restrictions of 
+# the AGPLv3 Section 13.
 #
-# You should have received a copy of the GNU General Public License
+# This program is distributed in the hope that it will be useful, but 
+# WITHOUT ANY WARRANTY; without even the implied warranty of 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License 
 # along with this program. If not, see <https://gnu.org>.
 # =====================================================================
 """PAI HTTP server — FastAPI wrapper around existing ops.
@@ -94,6 +100,13 @@ class TagRequest(BaseModel):
     tag: str = ""
 
 
+class AttachRequest(BaseModel):
+    brain: str | None = None
+    message_id: str = ""
+    filename: str = ""
+    content_b64: str = ""
+
+
 class RecallRequest(BaseModel):
     text: str = ""
     k: int = 8
@@ -163,6 +176,7 @@ def ingest(req: IngestMailRequest):
     # Attachments: extract text server-side (pdf/office via pandoc),
     # append under filename headers. Never fails the ingest.
     attach_text, attach_names = "", []
+    raw_atts: list = []  # (filename, bytes) for S3 WORM archive
     for att in (req.attachments or [])[:3]:
         try:
             import base64 as _b64
@@ -179,6 +193,7 @@ def ingest(req: IngestMailRequest):
             if len(data) > 8 * 1024 * 1024:
                 continue
             fname = att.get("filename") or "attachment"
+            raw_atts.append((fname, data))
             md = _extract_by_ext(data, _extension(fname), fname)
             if md and md.strip():
                 attach_names.append(fname)
@@ -201,6 +216,19 @@ def ingest(req: IngestMailRequest):
     if attach_text:
         out["attachments_extracted"] = attach_names
         out["attach_chars"] = len(attach_text)
+    # S3 WORM archive: immutable copy of mail + raw attachments.
+    # Never fails the ingest; duplicates and live=false skip (nothing new).
+    if not out.get("duplicate") and out.get("reason") != "live=false":
+        try:
+            from positronic_ai.archive import archive_mail
+            out["archive"] = archive_mail(
+                brain=brain, message_id=req.messageId or "",
+                sender=req.sender or "", subject=req.subject or "",
+                date=req.date or "", body=text,
+                episode_id=str(out.get("episode_id") or ""),
+                tau=out.get("tau"), attachments=raw_atts)
+        except Exception as ex:  # noqa: BLE001 — archive down: brain still has it
+            out["archive"] = {"archived": False, "error": str(ex)[:200]}
     return out
 
 
@@ -210,6 +238,14 @@ def tag(req: TagRequest):
     brain = resolve_brain(req.brain)
     return _run(PROJECT_DIR, brain=brain, episode_id=req.episode_id,
                 message_id=req.message_id, tag=req.tag)
+
+
+@app.post("/attach-text")
+def attach_text(req: AttachRequest):
+    from positronic_ai.ops.attach import run as _run
+    brain = resolve_brain(req.brain)
+    return _run(PROJECT_DIR, brain=brain, message_id=req.message_id,
+                filename=req.filename, content_b64=req.content_b64)
 
 
 @app.post("/recall")

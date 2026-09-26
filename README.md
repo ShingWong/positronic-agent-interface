@@ -2,7 +2,14 @@
 
 ### The polytemporal memory interface your agent actually calls
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+> **Strategic direction (2026-09-16):** PAI ships as a portable core —
+> WASM + sqlite-wasm + OPFS, shared across Thunderbird (Gecko), Outlook
+> (WebView2/Chromium), and Personabot. One core, many hosts; each product
+> is UI + adapter only. The Python server stays for power users
+> (embeddings, vision, multi-device) with the same API shape. Full pivot
+> doc: `positronic-private/product/PIVOT-WASM.md`.
+
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![SQLite Powered](https://img.shields.io/badge/Storage-SQLite-lightgrey)]()
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
 [![Recall](https://img.shields.io/badge/Recall-digest%20%2B%20dossier-brightgreen)]()
@@ -267,6 +274,22 @@ Key points to convey:
 - **[positronic-research](https://github.com/ShingWong?tab=repositories)** — the paper and benchmark harness behind the engine.
 - **This interface** — `positronic_ai/` (`cli.py`, `config.py`, `engine.py`, `objects.py`, `ops/*.py`).
 
+---
+
+## Policy enforcement (differentiator)
+
+Proven 10/10 on adversarial probes (threat, harassment, IP theft,
+kickback, backdoor, fraud, credential exposure, scam-victim reply —
+τ=5855). Positioning: mail vendors flag **inbound** phishing; we detect
+the **employee reply** ("I clicked it, here's my username") — that signal
+exists only inside the org mail store. No vendor can cover it.
+
+Notifications are reference-only (subject + one-line explanation + archive
+link, never the body — resending would loop the flag). Delivery is
+severity-tiered: immediate alert for high priority (violence, IP theft,
+backdoor, credential exposure), daily digest for low. Per-category
+priority + contact routing is customer-configurable at the org level.
+
 The plugins never touch `memeng` directly — they route into this interface. That keeps the engine
 portable and the plugin surface honest.
 
@@ -274,4 +297,4 @@ portable and the plugin surface honest.
 
 ## License
 
-GPL-3.0-or-later — see `LICENSE`.
+AGPL-3.0-or-later OR Commercial — see `LICENSE`.

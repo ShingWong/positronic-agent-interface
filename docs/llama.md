@@ -118,7 +118,7 @@ positronic doctor --json  # { tiers: { lexical, bge, llama, engram } }
 ```
 
 <!--
-Licensed under the GNU General Public License, version 3 or later (GPL-3.0-or-later).
+Licensed under AGPL-3.0-or-later OR Commercial (GNU Affero GPL v3 or a commercial waiver).
 Copyright (C) 2026 Shing Wong. All Rights Reserved.
 See LICENSE for the full license text.
 -->

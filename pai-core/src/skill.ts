@@ -1,3 +1,27 @@
+// =====================================================================
+// Project Positronic — Polytemporal Cognitive Engram Memory Substrate
+// Copyright (C) 2026 Shing Wong. All Rights Reserved.
+// =====================================================================
+// This program is DUAL-LICENSED. You may redistribute and/or modify it 
+// under the terms of the GNU Affero General Public License as published by the 
+// Free Software Foundation, either version 3 of the License, or (at your 
+// option) any later version.
+//
+// Alternatively, commercial entities, multi-tenant instances, and Managed 
+// Service Providers (MSPs) may utilize this program under a separate, 
+// proprietary Commercial License Waiver issued directly by the copyright 
+// holder, completely exempt from the network-use copyleft restrictions of 
+// the AGPLv3 Section 13.
+//
+// This program is distributed in the hope that it will be useful, but 
+// WITHOUT ANY WARRANTY; without even the implied warranty of 
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+// Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License 
+// along with this program. If not, see <https://gnu.org>.
+// =====================================================================
+
 // pai-core skill — the positronic agent skill for tool-capable LLMs.
 // Replaces regex intent-parsing (wantAll/wantCount/coreference patterns):
 // the model decides what to retrieve, executes tools, and answers from
@@ -15,6 +39,8 @@ Tools:
 - query_brain_sql(sql): full episode bodies (SELECT id, features_json
   FROM episode WHERE ...). Use when snippets lack detail (amounts, line
   items, attachments). IDs must match /^[0-9a-f-]{8,60}$/i.
+  Snippets truncate past ~250 chars: NEVER declare an amount, date, or
+  code absent until query_brain_sql has returned the full body.
 - ask_brain(object): dossier on a remembered person/thread/topic.
 
 Rules:
@@ -24,6 +50,10 @@ Rules:
 - Follow-ups ("that invoice", "amounts?") refer to prior tool results —
   re-query with the resolved terms, do not re-ask the user.
 - If tools return nothing relevant, say so. Never invent mail.
+- One episode's figures never transfer to another: an amount, date, or
+  confirmation code belongs only to the episode that states it. If the
+  number is not in the retrieved text, say so — do not borrow it from
+  a same-amount hit on a different subject.
 - Keep answers short; tables for lists with amounts.`;
 
 export interface ToolSchema {
@@ -162,6 +192,7 @@ export interface PositronicEpisode {
   sender?: string;
   tau?: number;
   threat_tag?: string;
+  kind?: string;
 }
 
 /** Host-provided backend access. Hosts implement fetch/filter; core formats. */
@@ -184,7 +215,11 @@ export function formatEpisodes(eps: PositronicEpisode[]): { text: string; source
       const subj = ep.subject || ep.title || "(no subject)";
       const label = subj.slice(0, 60);
       if (!sources.includes(label)) sources.push(label);
-      const body = (ep.snippet || ep.body || "").slice(0, 500);
+      // Attachment episodes are dense extraction text (line items live
+      // past the normal window), so give them the wider slice; chat-size
+      // mail keeps 500 chars to bound context on small models.
+      const window = ep.kind === "attachment" ? 2000 : 500;
+      const body = (ep.snippet || ep.body || "").slice(0, window);
       const threat = ep.threat_tag && ep.threat_tag !== "clean" ? ", " + ep.threat_tag : "";
       const tau = ep.tau != null ? ", tau=" + Number(ep.tau).toFixed(1) : "";
       return `[${i + 1}] ${subj} (${ep.sender || "unknown"}${tau}${threat}): ${body}`;
