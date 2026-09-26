@@ -22,7 +22,7 @@
 // along with this program. If not, see <https://gnu.org>.
 // =====================================================================
 
-// @positronic/pai-core — portable PAI logic. One core, many hosts.
+// @positronic-ai/pai-core — portable PAI logic. One core, many hosts.
 export { chunkMarkdown } from "./chunk.js";
 export { scoreThreat, type ThreatTag } from "./threat.js";
 export { detectTable, looksLikeTable, type TableSignals } from "./tables.js";
