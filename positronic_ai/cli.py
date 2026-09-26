@@ -151,7 +151,7 @@ def _run(verb, dir, args, flags) -> dict:
                              confirm=_flag(flags, "confirm"),
                              show_secrets=_flag(flags, "show-secrets"))
     if verb == "brain-test":
-        return OPS["brain-test"](dir, brain=_brain(flags) or "kairos",
+        return OPS["brain-test"](dir, brain=_brain(flags),
                                  k=_int(flags, "k", 3))
     if verb == "llm-stat":
         return OPS["llm-stat"]()

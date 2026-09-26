@@ -32,6 +32,7 @@ import json
 import math
 import time
 
+from ..config import load_config
 from ..engine import open_engine
 
 USAGE = ("positronic query <text> --brain <name> --k <n> | --sql <SQL> "
@@ -68,7 +69,7 @@ def _human(parsed) -> str:
 def run(dir, *, brain=None, text=None, sql=None, cue=None,
         objects=False, anchors=False, sightings=False, k=8,
         consolidation=None, context_window=0) -> dict:
-    brain = brain or "kairos"
+    brain = brain or next(iter(load_config(dir).get("brains", {})), None) or "kairos"
     k = k or 8
     try:
         s, e = open_engine(dir, brain)

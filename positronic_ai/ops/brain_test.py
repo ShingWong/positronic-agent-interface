@@ -28,12 +28,14 @@ from datetime import datetime, timezone
 
 from memeng.models import Event
 
+from ..config import load_config
 from ..engine import open_engine
 
 
-def run(dir, *, brain="kairos", k=3) -> dict:
+def run(dir, *, brain=None, k=3) -> dict:
     """Write a probe event, time encode + recall, return {ok, encode_ms, recall_ms, hits, fallback, rrf_score}."""
     k = k or 3
+    brain = brain or next(iter(load_config(dir).get("brains", {})), None) or "kairos"
     _s, e = open_engine(dir, brain)
 
     t0 = time.perf_counter()

@@ -25,6 +25,7 @@
 """Tag verb — manual threat-tag correction on one episode."""
 import json
 
+from ..config import load_config
 from ..engine import open_engine
 
 ALLOWED = ("clean", "spam", "phishing", "scam")
@@ -34,7 +35,7 @@ def run(dir, *, brain=None, episode_id=None, message_id=None,
         tag=None) -> dict:
     if tag not in ALLOWED:
         return {"ok": False, "error": f"tag must be one of {ALLOWED}"}
-    name = brain or "kairos"
+    name = brain or next(iter(load_config(dir).get("brains", {})), None) or "kairos"
     try:
         s, _e = open_engine(dir, name)
     except FileNotFoundError as ex:

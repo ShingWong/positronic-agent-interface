@@ -135,7 +135,7 @@ class AskRequest(BaseModel):
 
 
 class BrainTestRequest(BaseModel):
-    brain: str = "kairos"
+    brain: str | None = None
     k: int = 3
 
 
