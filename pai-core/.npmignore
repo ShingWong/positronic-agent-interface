@@ -1,0 +1,9 @@
+# package hygiene — ship dist, source and license only
+tests/
+tsconfig.json
+package-lock.json
+.gitignore
+__pycache__/
+coverage/
+*.tgz
+.npmrc
