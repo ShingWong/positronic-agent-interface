@@ -6,3 +6,13 @@ __pycache__/
 dist/
 build/
 node_modules/
+
+# sure-stack npm packages are developed and published on web2 (192.168.4.22,
+# /usr/local/devel/sure-*). They must never be staged here: a stray `git add -A`
+# would commit ~148 MB of node_modules into this public repo.
+sure-factor/
+sure-ui/
+sure-gentic/
+sure-state/
+sure-web-testing/
+sure-examples/
