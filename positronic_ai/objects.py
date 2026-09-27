@@ -30,11 +30,14 @@ can decide how deep to dig (ask reveals the full dossier, recall a digest).
 """
 from __future__ import annotations
 
+import re as _re
+
 _OBJECT_SQL = ("SELECT id, canonical_name, kind, status, salience, "
                "first_seen_tau, last_seen_tau FROM object "
                "WHERE canonical_name = ? OR canonical_name LIKE ? "
                "OR REPLACE(REPLACE(canonical_name,'-',' '),'_',' ') LIKE ? "
-               "ORDER BY (canonical_name = ?) DESC LIMIT 1")
+               "ORDER BY (canonical_name = ?) DESC, canonical_name ASC "
+               "LIMIT 32")
 _SIGHTINGS_SQL = ("SELECT os.episode_id, os.channel, os.confidence, "
                   "e.tau, e.wall, e.subject_norm, e.kind, "
                   "COALESCE(e.subject_norm, "
@@ -56,29 +59,33 @@ _DIGEST_SQL = ("SELECT COUNT(*) AS sighting_count, "
 def resolve_object(store, object_name: str) -> dict | None:
     """Fuzzy object lookup; returns the object row dict or None.
 
-    Matches the exact name, a word-boundary substring, or a
+    Matches the exact name, a whole-token substring, or a
     hyphen/underscore-normalized variant (entity extraction hyphenates
     'opencode plugin'; agents cue with spaces). Exact match ranks first.
-    Mid-word substrings never match ('shing' must not hit 'bashing').
+    The match must be bounded on *both* sides, so mid-word substrings never
+    match ('shing' must not hit 'bashing', and 'sys' must not hit 'system').
     """
     object_name = (object_name or "").strip()
     if not object_name:
         return None
     like = f"%{object_name}%"
-    row = store.conn.execute(
+    # Candidates, not a single row: the boundary test below is what decides,
+    # so it has to run over every candidate. Taking one arbitrary row first
+    # could discard the only row that actually matches.
+    rows = store.conn.execute(
         _OBJECT_SQL,
-        (object_name, like, like, object_name)).fetchone()
-    if row is None:
+        (object_name, like, like, object_name)).fetchall()
+    if not rows:
         return None
-    hit = dict(row)
-    if hit["canonical_name"] == object_name:
-        return hit
-    import re as _re
-    boundary = _re.compile(r"(^|[\s\-_])" + _re.escape(object_name),
-                           _re.IGNORECASE)
-    norm = hit["canonical_name"].replace("-", " ").replace("_", " ")
-    if boundary.search(hit["canonical_name"]) or boundary.search(norm):
-        return hit
+    boundary = _re.compile(r"(^|[\s\-_])" + _re.escape(object_name)
+                           + r"($|[\s\-_])", _re.IGNORECASE)
+    for row in rows:
+        hit = dict(row)
+        if hit["canonical_name"] == object_name:
+            return hit
+        norm = hit["canonical_name"].replace("-", " ").replace("_", " ")
+        if boundary.search(hit["canonical_name"]) or boundary.search(norm):
+            return hit
     return None
 
 def object_sightings(store, object_id: str) -> list[dict]:

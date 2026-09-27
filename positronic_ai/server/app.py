@@ -29,6 +29,7 @@ Config via env vars:
   POSITRONIC_SERVER_HOST — bind host (default: 0.0.0.0)
   POSITRONIC_SERVER_PORT — bind port (default: 8080)
 """
+import logging
 import os
 import re
 
@@ -40,6 +41,29 @@ from pydantic import BaseModel
 PROJECT_DIR = os.environ.get("POSITRONIC_PROJECT_DIR", os.getcwd())
 SERVER_HOST = os.environ.get("POSITRONIC_SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.environ.get("POSITRONIC_SERVER_PORT", "8080"))
+
+log = logging.getLogger(__name__)
+
+# Ingest attachment limits. The input caps bound decode cost; the text cap
+# bounds what actually reaches body_text, FTS and the embedding payload.
+MAX_ATTACHMENTS = 3
+MAX_ATTACH_BYTES = 8 * 1024 * 1024
+MAX_ATTACH_ENCODED_CHARS = 12 * 1024 * 1024     # ~9 MiB once base64-decoded
+MAX_ATTACH_TEXT_CHARS = 50_000                  # total extracted text per mail
+
+_FILENAME_STRIP = re.compile(r"[\x00-\x1f\x7f\[\]]+")
+
+
+def _safe_filename(name) -> str:
+    """Reduce an attachment filename to a bare, inert, bounded name.
+
+    The name comes from the request body and is interpolated into the stored
+    message text, so a name carrying newlines or brackets could forge body
+    content. Basename only, no control characters or brackets, capped.
+    """
+    base = os.path.basename((name or "").strip().replace("\\", "/"))
+    base = _FILENAME_STRIP.sub("_", base).strip(" ._")
+    return base[:120] or "attachment"
 
 
 def sanitize_brain(name) -> str | None:
@@ -58,7 +82,32 @@ def sanitize_brain(name) -> str | None:
 # POSITRONIC_MAIL_BRAIN. When set, every endpoint is pinned to it —
 # client-supplied brain names are ignored, so mail brains can never
 # cross into each other or into session brains like kairos.
-MAIL_BRAIN = sanitize_brain(os.environ.get("POSITRONIC_MAIL_BRAIN"))
+#
+# A value that is present but sanitizes to nothing ("---", "???", whitespace)
+# is a misconfiguration, not an absent pin. Falling back to the unpinned
+# federated path there would silently open every read endpoint across all
+# brains, so we remember that the operator asked for isolation and refuse
+# instead.
+MAIL_BRAIN_RAW = os.environ.get("POSITRONIC_MAIL_BRAIN")
+MAIL_BRAIN = sanitize_brain(MAIL_BRAIN_RAW)
+MAIL_BRAIN_MISCONFIGURED = bool(MAIL_BRAIN_RAW) and not MAIL_BRAIN
+if MAIL_BRAIN_MISCONFIGURED:
+    log.error("POSITRONIC_MAIL_BRAIN=%r has no usable brain name; read "
+              "endpoints are refusing service rather than fanning out across "
+              "every configured brain", MAIL_BRAIN_RAW)
+
+
+def isolation_guard() -> dict | None:
+    """The refusal payload when the pin is set but unusable, else None."""
+    return isolation_refusal() if MAIL_BRAIN_MISCONFIGURED else None
+
+
+def isolation_refusal() -> dict:
+    """Fail-closed response for a misconfigured isolation pin."""
+    return {"error": "mail brain misconfigured",
+            "detail": "POSITRONIC_MAIL_BRAIN is set but is not a usable "
+                      "brain name; refusing to read across brains",
+            "object": None, "sightings": [], "found": False}
 
 
 def resolve_brain(req_brain) -> str | None:
@@ -160,6 +209,17 @@ def health():
 def ingest(req: IngestMailRequest):
     from positronic_ai.ops.ingest import run as _run
     brain = resolve_brain(req.brain)
+    # Replays must not pay for extraction: this probe is a cheap indexed
+    # lookup, while the extractors below can each run for minutes.
+    if req.messageId:
+        from positronic_ai.ops.ingest import find_duplicate
+        dup = find_duplicate(PROJECT_DIR, req.messageId, brain=brain,
+                             kind="message")
+        if dup is not None:
+            dup["brain"] = brain
+            dup["body_chars"] = len((req.body or "").strip())
+            dup["body_convert"] = "duplicate"
+            return dup
     # Store the body honestly — empty stays empty so the client can warn.
     # The op falls back to subject only for the subject_norm label.
     text = (req.body or "").strip()
@@ -175,14 +235,22 @@ def ingest(req: IngestMailRequest):
             body_convert = "regex-fallback"
     # Attachments: extract text server-side (pdf/office via pandoc),
     # append under filename headers. Never fails the ingest.
+    # Caps are on the *output* as well as the input: a zip lists one line per
+    # member, so extracted text can dwarf the input it came from, and all of it
+    # lands in body_text -> FTS -> embedding.
     attach_text, attach_names = "", []
     raw_atts: list = []  # (filename, bytes) for S3 WORM archive
-    for att in (req.attachments or [])[:3]:
+    budget = MAX_ATTACH_TEXT_CHARS
+    for att in (req.attachments or [])[:MAX_ATTACHMENTS]:
         try:
             import base64 as _b64
 
             from positronic_ai.extract.attach import _extract_by_ext, _extension
             raw = att.get("data") or ""
+            # Reject on the *encoded* length: decoding first would materialise
+            # an arbitrarily large buffer just to measure it.
+            if len(raw) > MAX_ATTACH_ENCODED_CHARS:
+                continue
             try:
                 data = _b64.b64decode(raw, validate=False)
                 # Heuristic: genuine base64 of binary decodes to non-text.
@@ -190,14 +258,21 @@ def ingest(req: IngestMailRequest):
                     raise ValueError("short decode — treat as text")
             except Exception:  # noqa: BLE001 — fall back to raw text bytes
                 data = raw.encode("utf-8", "replace")
-            if len(data) > 8 * 1024 * 1024:
+            if len(data) > MAX_ATTACH_BYTES:
                 continue
-            fname = att.get("filename") or "attachment"
+            # The filename is attacker-controlled and is about to be written
+            # into the stored body, so reduce it to a bare, inert name first:
+            # newlines would otherwise forge message content.
+            fname = _safe_filename(att.get("filename"))
             raw_atts.append((fname, data))
             md = _extract_by_ext(data, _extension(fname), fname)
-            if md and md.strip():
+            if md and md.strip() and budget > 0:
+                md = md.strip()
+                if len(md) > budget:
+                    md = md[:budget].rstrip() + "\n[truncated]"
+                budget -= len(md)
                 attach_names.append(fname)
-                attach_text += f"\n\n[Attachment: {fname}]\n{md.strip()}"
+                attach_text += f"\n\n[Attachment: {fname}]\n{md}"
         except Exception:  # noqa: BLE001 — one bad part never kills mail
             continue
     if attach_text:
@@ -209,7 +284,9 @@ def ingest(req: IngestMailRequest):
                date=req.date or None,
                message_id=req.messageId or None,
                role="assistant",
-               attachment_names=[a.get("filename", "") for a in (req.attachments or []) if a.get("filename")])
+               # Only the names whose text actually made it in: the raw
+               # request list is attacker-controlled in count and length.
+               attachment_names=attach_names[:MAX_ATTACHMENTS])
     out["brain"] = brain
     out["body_chars"] = len(text)
     out["body_convert"] = body_convert
@@ -251,6 +328,8 @@ def attach_text(req: AttachRequest):
 @app.post("/recall")
 def recall(req: RecallRequest):
     from positronic_ai.ops.recall import run as _run
+    if (refused := isolation_guard()) is not None:
+        return refused
     brains = [MAIL_BRAIN] if MAIL_BRAIN else req.brains
     return _run(PROJECT_DIR, req.text, k=req.k, brains=brains,
                 consolidation=req.consolidation,
@@ -261,6 +340,8 @@ def recall(req: RecallRequest):
 @app.post("/query")
 def query(req: QueryRequest):
     from positronic_ai.ops.query import run as _run
+    if (refused := isolation_guard()) is not None:
+        return refused
     brain = MAIL_BRAIN or req.brain
     return _run(PROJECT_DIR, brain=brain, text=req.text, sql=req.sql,
                 cue=req.cue, objects=req.objects, anchors=req.anchors,
@@ -272,6 +353,8 @@ def query(req: QueryRequest):
 @app.post("/ask")
 def ask(req: AskRequest):
     from positronic_ai.ops.ask import run as _run
+    if (refused := isolation_guard()) is not None:
+        return refused
     if MAIL_BRAIN:
         return _run(PROJECT_DIR, req.object_name, brains=[MAIL_BRAIN])
     return _run(PROJECT_DIR, req.object_name)
@@ -280,12 +363,16 @@ def ask(req: AskRequest):
 @app.post("/brain-test")
 def brain_test(req: BrainTestRequest):
     from positronic_ai.ops.brain_test import run as _run
+    if (refused := isolation_guard()) is not None:
+        return refused
     return _run(PROJECT_DIR, brain=MAIL_BRAIN or req.brain, k=req.k)
 
 
 @app.get("/info")
 def info():
     from positronic_ai.ops.info import run as _run
+    if (refused := isolation_guard()) is not None:
+        return refused
     out = _run(PROJECT_DIR)
     if MAIL_BRAIN:
         # Pinned instance: disclose only the served brain.
@@ -298,6 +385,8 @@ def info():
 @app.get("/stats")
 def stats():
     from positronic_ai.ops.stats import run as _run
+    if (refused := isolation_guard()) is not None:
+        return refused
     if MAIL_BRAIN:
         return _run(PROJECT_DIR, brain=MAIL_BRAIN)
     return _run(PROJECT_DIR)

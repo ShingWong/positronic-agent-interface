@@ -42,6 +42,36 @@ def normalize_message_id(raw) -> str:
     return mid
 
 
+def _dup_result(conn, mid: str) -> dict | None:
+    """The duplicate verdict for a normalised message id, or None."""
+    row = conn.execute(
+        "SELECT id FROM episode WHERE kind='message' "
+        "AND json_extract(features_json,'$.message_id') = ? "
+        "LIMIT 1", (mid,)).fetchone()
+    if row is None:
+        return None
+    return {"duplicate": True, "skipped": True, "tau": None,
+            "episode_id": row["id"], "by": "message_id"}
+
+
+def find_duplicate(dir, message_id, *, brain=None, kind="message") -> dict | None:
+    """Cheap message_id probe for callers that do expensive work first.
+
+    The HTTP ingest path extracts attachment text (minutes, per part) before
+    calling run(); without this probe a replayed message pays that cost and
+    then throws the result away.
+    """
+    mid = normalize_message_id(message_id)
+    if kind != "message" or not mid:
+        return None
+    cfg = load_config(dir)
+    name = brain or next(iter(cfg.get("brains", {})), None)
+    if not name:
+        return None
+    s, _ = open_engine(dir, name)
+    return _dup_result(s.conn, mid)
+
+
 def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
         dedup=None, role="assistant", sender=None, date=None,
         message_id=None, threat=True, attachment_names=None) -> dict:
@@ -55,13 +85,9 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
 
     mid = normalize_message_id(message_id)
     if kind == "message" and mid:
-        row = s.conn.execute(
-            "SELECT id FROM episode WHERE kind='message' "
-            "AND json_extract(features_json,'$.message_id') = ? "
-            "LIMIT 1", (mid,)).fetchone()
-        if row is not None:
-            return {"duplicate": True, "skipped": True, "tau": None,
-                    "episode_id": row["id"], "by": "message_id"}
+        dup = _dup_result(s.conn, mid)
+        if dup is not None:
+            return dup
 
     dedup_eff = cfg.get("dedup") if dedup is None else dedup
     if kind == "message" and dedup_eff and not mid:

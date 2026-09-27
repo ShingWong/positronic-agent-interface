@@ -43,8 +43,11 @@ def run(dir, object_name, *, brains=None) -> dict:
     if not (object_name or "").strip():
         return {"object": None, "sightings": [], "found": False}
     cfg = load_config(dir)
-    names = [b for b in (brains or list(cfg.get("brains", {})))
-             if b in cfg.get("brains", {})]
+    # `brains is None` means "no filter"; an explicit empty list means "read no
+    # brains". Collapsing the two would turn a fail-closed call into a fan-out
+    # across every configured brain, which is the leak this pin exists to stop.
+    wanted = list(cfg.get("brains", {})) if brains is None else list(brains)
+    names = [b for b in wanted if b in cfg.get("brains", {})]
     for name in names:
         db = Path(dir) / ".positronic" / "brains" / name / "memory.db"
         if not db.exists():
