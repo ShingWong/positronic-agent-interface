@@ -195,12 +195,18 @@ the subject); the response adds `brain` + `body_chars` so clients can warn.
 
 S3 WORM archive (`positronic_ai/archive.py`, needs `boto3`): on a
 successful non-duplicate ingest the server PUTs `envelope.json`
-(sender/subject/date/body/sha256/episode/tau) plus raw attachment
-bytes to the configured bucket under
-`<brain>/<YYYY>/<MM>/<message-id>/`. The response carries
-`archive: {archived, bucket, key, attachments, lock_mode,
-retain_until}` — or `{archived: false, error}` when S3 is down
-or unconfigured. Archival never fails the ingest. Env:
+(sender/subject/date/body/sha256/episode/tau/attachment keys +
+per-attachment sha256) plus raw attachment bytes to the configured
+bucket under `<brain>/<YYYY>/<MM>/<message-id>-<digest>/`, where the
+period comes from the message's own `Date` header. The response carries
+`archive: {archived, bucket, key, attachments, att_digests, skipped,
+envelope_locked, lock_proof, att_locks, lock_mode, retain_until}`. Each
+object is read back with `head_object` and its Object Lock verified, so
+`archived:true` means the envelope *and* every attachment are proven
+immutable — an unlocked bucket, a missing retain-until date or an
+expired one yields `archived:false` with the reason in `lock_proof`. It
+is `{archived: false, error}` when S3 is down or unconfigured.
+Archival never fails the ingest. Env:
 `POSITRONIC_S3_ENDPOINT` (default `http://127.0.0.1:9002`),
 `POSITRONIC_S3_BUCKET` (default `mail-archive`),
 `POSITRONIC_S3_ACCESS_KEY` / `POSITRONIC_S3_SECRET_KEY` (no default;

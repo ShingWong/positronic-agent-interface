@@ -34,15 +34,29 @@ no credentials there.
 ## Write path (PAI ingest → S3)
 
 - `positronic_ai/archive.py::archive_mail` — PUTs `envelope.json`
-  (sender/subject/date/body/sha256/episode/tau/attachment keys) plus
-  raw attachment bytes. Bucket default retention applies automatically;
-  lock mode is read back via `head_object` as proof.
+  (sender/subject/date/body/sha256/episode/tau/attachment keys +
+  per-attachment sha256) plus raw attachment bytes. Bucket default
+  retention applies automatically. Every object written — envelope and
+  each attachment — is then read back with `head_object` and the lock is
+  **verified**: a mode must be present and `RetainUntilDate` must still
+  be in the future. `archived:true` is returned only when the whole set
+  is proven immutable, so a bucket that is not Object-Lock enabled (or an
+  expired retention) reports `archived:false` with the reason in
+  `lock_proof` rather than claiming a compliance archive.
 - `server/app.py` `/ingest` — collects raw bytes in the existing
   decode loop, archives after a successful brain write. Duplicates and
   `live=false` skip. Every exception is caught: archival never fails
   an ingest; failures surface as `archive: {archived:false, error}`.
-- Key layout: `<brain>/<YYYY>/<MM>/<message-id>/envelope.json` and
-  `.../attachments/<nn>-<filename>`. Requires `boto3`
+- Key layout: `<brain>/<YYYY>/<MM>/<message-id>-<digest>/envelope.json`
+  and `.../attachments/<nn>-<filename>`. The `<YYYY>/<MM>` comes from
+  the message's own `Date` header when parseable (archive time
+  otherwise), and the leaf carries a digest of the full id, so
+  re-archiving the same mail is idempotent instead of silently creating a
+  second copy or colliding with a truncated slug. Key segments are
+  slugged so no segment can read as `.` or `..` — S3 keys are opaque,
+  but `mc cp`/s3fs materialise them as paths. Uploads are bounded at
+  8 MiB per attachment and 16 MiB per mail; anything larger is skipped
+  and listed in `skipped`. Requires `boto3`
   (`pip install --user --break-system-packages boto3`).
 
 ## Procedures
