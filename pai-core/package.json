@@ -2,7 +2,7 @@
   "name": "@positronic-ai/pai-core",
   "version": "0.1.0",
   "description": "Portable PAI core: chunk, threat, table-detect, message-id. Plain TS, no deps. Hosts provide storage (sqlite-wasm + OPFS) and transport.",
-  "license": "AGPL-3.0-or-later OR Commercial",
+  "license": "AGPL-3.0-or-later OR LicenseRef-Commercial",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

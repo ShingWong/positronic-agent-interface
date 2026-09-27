@@ -297,4 +297,4 @@ portable and the plugin surface honest.
 
 ## License
 
-AGPL-3.0-or-later OR Commercial — see `LICENSE`.
+AGPL-3.0-or-later OR LicenseRef-Commercial — see `LICENSE`.

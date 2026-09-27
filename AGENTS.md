@@ -1,8 +1,26 @@
-<!--
-Licensed under AGPL-3.0-or-later OR Commercial (GNU Affero GPL v3 or a commercial waiver).
+<!-- =====================================================================
+Project Positronic — Polytemporal Cognitive Engram Memory Substrate
 Copyright (C) 2026 Shing Wong. All Rights Reserved.
-See LICENSE for the full license text.
--->
+=====================================================================
+This program is DUAL-LICENSED. You may redistribute and/or modify it 
+under the terms of the GNU Affero General Public License as published by the 
+Free Software Foundation, either version 3 of the License, or (at your 
+option) any later version.
+
+Alternatively, commercial entities, multi-tenant instances, and Managed 
+Service Providers (MSPs) may utilize this program under a separate, 
+proprietary Commercial License Waiver issued directly by the copyright 
+holder, completely exempt from the network-use copyleft restrictions of 
+the AGPLv3 Section 13.
+
+This program is distributed in the hope that it will be useful, but 
+WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License 
+along with this program. If not, see <https://gnu.org>.
+===================================================================== -->
 
 # AGENTS.md — positronic-agent-interface
 
@@ -47,7 +65,7 @@ ruff check positronic_ai/ tests/
 ```
 
 Every `.py` file carries the AGPL dual-license header; `pyproject.toml` carries
-`license = "AGPL-3.0-or-later OR Commercial"`. No MCP anywhere.
+`license = "AGPL-3.0-or-later OR LicenseRef-Commercial"`. No MCP anywhere.
 
 ## Note
 
