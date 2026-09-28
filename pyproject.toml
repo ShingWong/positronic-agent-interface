@@ -9,8 +9,16 @@ description = "Polytemporal memory agent interface over memeng"
 license = "AGPL-3.0-or-later OR LicenseRef-Commercial"
 requires-python = ">=3.10"
 dependencies = [
-  "memeng @ git+https://github.com/ShingWong/positronic-engram.git@v0.2.0#subdirectory=engine",
+  "memeng @ git+https://github.com/ShingWong/positronic-engram.git@v0.2.1#subdirectory=engine",
 ]
+
+[project.optional-dependencies]
+# Undeclared before: the server and attachment tests need fastapi + uvicorn,
+# the attachment test needs openpyxl, fastapi's test client needs httpx2, and
+# the S3 Object Lock archive tests need boto3 (imported at positronic_ai/
+# archive.py). Locally these all came from the ambient system interpreter, so a
+# clean install could not even collect the suite.
+test = ["pytest>=8", "fastapi", "uvicorn", "openpyxl", "httpx2", "boto3"]
 
 [project.scripts]
 positronic = "positronic_ai.cli:main"
