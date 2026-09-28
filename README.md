@@ -9,7 +9,7 @@
 > (embeddings, vision, multi-device) with the same API shape. Full pivot
 > doc: `positronic-private/product/PIVOT-WASM.md`.
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![License: AGPL-3.0-or-later OR LicenseRef-Commercial](https://img.shields.io/badge/License-AGPL--3.0--or--later%20OR%20LicenseRef--Commercial-blue.svg)](LICENSE)
 [![SQLite Powered](https://img.shields.io/badge/Storage-SQLite-lightgrey)]()
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
 [![Recall](https://img.shields.io/badge/Recall-digest%20%2B%20dossier-brightgreen)]()
