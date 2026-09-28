@@ -1,0 +1,14 @@
+name: ci
+on: { push: { branches: [main] }, pull_request: {} }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      # The `test` extra carries pytest, fastapi, uvicorn, openpyxl, httpx2 and
+      # boto3. All of these were previously satisfied only by the ambient
+      # system interpreter, so a clean install could not collect the suite.
+      - run: pip install -e ".[test]"
+      - run: python -m pytest -q
