@@ -11,4 +11,17 @@ jobs:
       # boto3. All of these were previously satisfied only by the ambient
       # system interpreter, so a clean install could not collect the suite.
       - run: pip install -e ".[test]"
+      # Real converters, so the HTML->markdown and PDF/RTF extraction paths stay
+      # covered rather than skipped. attach.py defers by design when they are
+      # missing; installing them means CI actually exercises those extractors.
+      - name: Install document converters
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends pandoc poppler-utils
+      # tests/test_embed.py talks to a local BGE service on :8090, which a
+      # runner does not have. "off" is the suite's own documented switch for
+      # that, and skips the three live-service tests instead of failing them
+      # with connection-refused. The rest of the suite is unaffected.
       - run: python -m pytest -q
+        env:
+          POSITRONIC_BGE_URL: 'off'

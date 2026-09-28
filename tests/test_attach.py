@@ -26,6 +26,7 @@ import email.generator
 import email.message
 import io
 import json
+import shutil
 import subprocess
 
 # body-walk lives outside this package; add its dir to path
@@ -120,6 +121,12 @@ def _mk_eml(attach_bytes: bytes, filename: str) -> bytes:
 
 
 def test_attach_pdf():
+    # Extraction defers by design when the converter is absent, so a runner
+    # without poppler would fail an assertion about a capability it does not
+    # have. Skip instead of asserting on a missing tool.
+    if not shutil.which("pdftotext"):
+        import pytest
+        pytest.skip("pdftotext not on PATH (apt install poppler-utils)")
     recs = extract_attachments(_mk_eml(_mk_pdf(), "r.pdf"))
     pdf = _find(recs, "r.pdf")
     assert pdf["status"] == "ok"
@@ -142,6 +149,9 @@ def test_attach_xlsx():
 
 
 def test_attach_rtf_via_pandoc():
+    if not shutil.which("pandoc"):
+        import pytest
+        pytest.skip("pandoc not on PATH (apt install pandoc)")
     rtf = (b"{\\rtf1\\ansi\\deff0 hello world}\n")
     recs = extract_attachments(_mk_eml(rtf, "note.rtf"))
     r = _find(recs, "note.rtf")
