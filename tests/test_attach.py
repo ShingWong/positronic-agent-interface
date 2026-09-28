@@ -39,11 +39,28 @@ import openpyxl
 from positronic_ai.engine import open_engine
 from positronic_ai.extract.attach import extract_attachments
 
-_sys_path = str(_P(__file__).resolve().parent.parent.parent
-                   / "positronic-private")
-if _sys_path not in sys.path:
-    sys.path.insert(0, _sys_path)
-import brain_henry.mail_body_ingest as M
+def _mail_body_ingest():
+    """Import the private mail-body walker, or return None if unavailable.
+
+    The end-to-end attachment test exercises the real body walker, which lives
+    in the private corpus repo and is not a dependency of this package. Import
+    it lazily: a module-level import made this file uncollectable on any
+    machine without that repo checked out, which took all 11 tests in this
+    module with it. Point POSITRONIC_PRIVATE_REPO at it, or keep it as a
+    sibling checkout.
+    """
+    import os
+    root = os.environ.get("POSITRONIC_PRIVATE_REPO", "").strip()
+    if not root:
+        sibling = _P(__file__).resolve().parent.parent.parent / "positronic-private"
+        root = str(sibling) if sibling.is_dir() else ""
+    if root and root not in sys.path:
+        sys.path.insert(0, root)
+    try:
+        import brain_henry.mail_body_ingest as mod
+    except ImportError:
+        return None
+    return mod
 
 
 def _find(recs, name):
@@ -198,6 +215,10 @@ def test_extract_no_attachments_returns_empty():
 
 
 def test_attachments_e2e(tmp_path):
+    M = _mail_body_ingest()
+    if M is None:
+        import pytest
+        pytest.skip("private mail-body walker unavailable; set POSITRONIC_PRIVATE_REPO")
     subprocess.run(["python3", "-m", "positronic_ai", "init",
                         "--brain", "kairos", "--profile", "balanced"],
                    cwd=str(tmp_path), check=True, capture_output=True)
