@@ -30,16 +30,21 @@ existence, lexical always ok (FTS5).
 """
 import json
 import logging
+import os
 import shutil
 import urllib.request
 from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-ENGINE_SRC = Path("/usr/local/devel/positronic/positronic-engram/engine/src")
 BGE_URL = "http://127.0.0.1:8090/health"
 BGE_TIMEOUT = 2
-LLAMA_FALLBACK = "/home/swong/dls/.tmp/beellama-check/build-hip/bin/llama-server"
+# llama-server is an optional local model server, so it is never on PATH by
+# default and cannot be assumed to exist. The old LLAMA_FALLBACK constant
+# hardcoded one developer's ~/.tmp build tree: a username in shipped public
+# package code, pointing at a directory that disappears on any rebuild. Probe
+# PATH plus whatever POSITRONIC_LLAMA_SERVER names instead.
+LLAMA_ENV = "POSITRONIC_LLAMA_SERVER"
 
 def run() -> dict:
     """Probe each tier; returns {tiers: {engram, bge, llama, lexical}}."""
@@ -53,8 +58,13 @@ def run() -> dict:
     }
 
 def _engram() -> str:
-    if not (ENGINE_SRC / "memeng" / "store.py").exists():
-        return "missing"
+    # memeng is a declared dependency, so the import *is* the test — it works
+    # from a wheel, a venv or a source checkout at any path. This used to be
+    # gated on a hardcoded ENGINE_SRC/memeng/store.py existing first, which
+    # reported "missing" on any machine where memeng was installed correctly
+    # but not at that one absolute path, and "ok" where the import would have
+    # failed anyway. The module docstring already said this was a PYTHONPATH
+    # import probe; the path check contradicted it.
     try:
         import memeng.store  # noqa: F401
         return "ok"
@@ -72,6 +82,7 @@ def _bge() -> str:
         return "down"
 
 def _llama() -> str:
-    if shutil.which("llama-server") or Path(LLAMA_FALLBACK).exists():
+    exe = os.environ.get(LLAMA_ENV) or "llama-server"
+    if shutil.which(exe) or Path(exe).is_file():
         return "ok"
     return "missing"

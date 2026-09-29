@@ -23,11 +23,14 @@
 # =====================================================================
 
 import tempfile
+from pathlib import Path
 
 from positronic_ai.brains import init_brain
 from positronic_ai.config import load_config, set_key
 from positronic_ai.ops.ingest import run as ingest
 from positronic_ai.ops.query import run as query
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _seed(dir):
@@ -121,8 +124,13 @@ def test_init_sets_auto_flags():
     import subprocess
     import sys
     env = dict(os.environ)
-    env["PYTHONPATH"] = "/usr/local/devel/positronic/positronic-engram/engine/src:" + \
-                        "/usr/local/devel/positronic/positronic-agent-interface"
+    # Both positronic_ai and memeng are declared dependencies, so the inherited
+    # environment already resolves them. Only this checkout is added, so the
+    # subprocess exercises the tree under test. The two absolute entries this
+    # replaces named one machine's checkout and sibling repo, and resolved to
+    # nothing anywhere else.
+    env["PYTHONPATH"] = os.pathsep.join(
+        p for p in (str(ROOT), env.get("PYTHONPATH", "")) if p)
     with tempfile.TemporaryDirectory() as d:
         r = subprocess.run(
             [sys.executable, "-m", "positronic_ai", "init",

@@ -34,12 +34,18 @@ import pytest
 
 PY = sys.executable
 ROOT = Path(__file__).resolve().parents[1]
-ENGINE_SRC = "/usr/local/devel/positronic/positronic-engram/engine/src"
 
 
 def _env():
+    """Run this checkout, not whatever is installed.
+
+    positronic_ai and memeng are both declared dependencies, so the inherited
+    environment already resolves them; the only path worth adding is ROOT, so
+    the subprocess imports the tree under test. The old ENGINE_SRC entry named
+    one machine's sibling engram checkout and resolved to nothing elsewhere.
+    """
     env = dict(os.environ)
-    parts = [ENGINE_SRC, str(ROOT), env.get("PYTHONPATH", "")]
+    parts = [str(ROOT), env.get("PYTHONPATH", "")]
     env["PYTHONPATH"] = os.pathsep.join(p for p in parts if p)
     return env
 
