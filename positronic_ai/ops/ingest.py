@@ -140,9 +140,14 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
             "SELECT COUNT(*) c FROM episode WHERE kind='message' "
             "AND json_extract(features_json,'$.sender') = ?",
             (str(sender),)).fetchone()
-        from ..threat import score_threat
-        verdict = score_threat(sender, subj, body,
-                               (hist["c"] if hist else 0))
+        from ..threat import score_threat, spec_from_config
+        bcfg = (cfg.get("brains") or {}).get(name) or {}
+        spec = spec_from_config(bcfg)
+        if spec.get("disabled"):
+            verdict = {"tag": "clean", "reasons": [], "scores": {}}
+        else:
+            verdict = score_threat(sender, subj, body,
+                                   (hist["c"] if hist else 0), spec=spec)
         features["threat_tag"] = verdict["tag"]
         features["threat_reasons"] = verdict["reasons"]
     r = e.new_event(Event(stream=f"positronic:{name}", kind=kind,

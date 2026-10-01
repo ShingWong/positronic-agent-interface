@@ -63,13 +63,33 @@ def load_config(project_dir) -> dict:
     return data
 
 def _validate(cfg: dict) -> None:
-    for b in cfg.get("brains", {}).values():
+    from memeng.engine import MemoryEngine
+    engine_knobs = set(MemoryEngine.default_config())
+    for name, b in cfg.get("brains", {}).items():
         prof = b.get("profile")
         if prof and prof not in ALLOWED_PROFILES:
             raise ValueError(f"unknown retention profile: {prof}")
         emb = b.get("embed")
         if emb and emb not in ALLOWED_EMBEDS:
             raise ValueError(f"unknown embed choice: {emb}")
+        # Per-brain engine knobs. Rejecting unknown names is the whole point:
+        # memeng silently ignores a key it does not read, so a typo would
+        # otherwise be a setting that appears to work and does not.
+        nested = b.get("engine") or {}
+        if not isinstance(nested, dict):
+            raise ValueError(  # noqa: TRY004 (CLI catches ValueError)
+                f"brains.{name}.engine must be an object")
+        unknown = sorted(set(nested) - engine_knobs)
+        if unknown:
+            raise ValueError(
+                f"brains.{name}.engine has unknown knob(s): {unknown}. "
+                f"Known knobs: {sorted(engine_knobs)}")
+        thr = b.get("threshold")
+        if thr is not None and not (0.0 <= float(thr) <= 1.0):
+            raise ValueError(f"brains.{name}.threshold must be in [0,1]")
+        if b.get("threat") is not None:
+            from .threat import validate_spec_override
+            validate_spec_override(b["threat"], brain=name)
     live = cfg.get("live")
     if live is not None and not isinstance(live, bool):
         raise ValueError("live must be a boolean")
@@ -104,9 +124,11 @@ def set_key(project_dir, key: str, value, *, brain: str | None = None) -> dict:
     """Set one config key; returns {changed, before, after}."""
     cfg = load_config(project_dir)
     before = json.loads(json.dumps(cfg))
-    if key in ("profile", "embed", "threshold"):
+    if key in ("profile", "embed", "threshold", "engine", "threat"):
         if not brain:
-            raise ValueError("brain required for per-brain key: profile|embed|threshold")
+            raise ValueError(
+                "brain required for per-brain key: "
+                "profile|embed|threshold|engine|threat")
         if brain not in cfg["brains"]:
             raise ValueError(f"unknown brain {brain}")
         if key == "profile" and value not in ALLOWED_PROFILES:
@@ -115,6 +137,15 @@ def set_key(project_dir, key: str, value, *, brain: str | None = None) -> dict:
             raise ValueError(f"unknown embed choice {value}")
         if key == "threshold":
             value = float(value)
+        if key == "engine":
+            # Merge, so setting one knob does not erase the others.
+            patch = value or {}
+            if not isinstance(patch, dict):
+                raise ValueError("engine must be an object of knob -> value")
+            cfg["brains"][brain].setdefault("engine", {}).update(patch)
+        if key == "threat":
+            cfg["brains"][brain]["threat"] = value
+            value = cfg["brains"][brain]["threat"]
         cfg["brains"][brain][key] = value
     elif key == "live":
         cfg["live"] = bool(value)
