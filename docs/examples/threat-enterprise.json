@@ -1,0 +1,65 @@
+{
+  "_comment": [
+    "Enterprise compliance profile for a brain that watches corporate mail",
+    "for policy breaches and illegal activity.",
+    "",
+    "Copy the `threat` object into .positronic/config.json under the brain,",
+    "or set it with: positronic config --brain <name> --key threat --set @file.json",
+    "",
+    "Only `categories` you list are replaced. phishing, scam and spam keep",
+    "their defaults, so this adds to the baseline rather than replacing it.",
+    "Order the tags by `priority`: the highest-priority category that reaches",
+    "its `threshold` wins."
+  ],
+
+  "threat": {
+    "credential_terms": [
+      "login", "log in", "sign in", "verify", "password", "credential",
+      "2fa", "one-time", "rotate your token", "re-enter your details"
+    ],
+    "brands": [
+      "adobe", "microsoft", "apple", "google", "amazon", "paypal",
+      "dhl", "fedex", "okta", "github", "atlassian", "docusign"
+    ],
+    "categories": [
+      {
+        "tag": "policy",
+        "priority": 95,
+        "threshold": 1.0,
+        "_what": "Confidential or restricted information being sent or discussed.",
+        "_tune": "Raise threshold to 2.0 and add a second signal if one term is too weak.",
+        "signals": [
+          {
+            "id": "policy-lexicon",
+            "kind": "lexicon",
+            "weight": 1.0,
+            "terms": [
+              "material nonpublic", "inside information", "insider information",
+              "confidential", "restricted distribution", "do not forward",
+              "trade secret", "under nda", "need to know only"
+            ]
+          }
+        ]
+      },
+      {
+        "tag": "illegal",
+        "priority": 96,
+        "threshold": 1.0,
+        "_what": "Activity that may be unlawful. This is a prompt to a human, not a verdict.",
+        "_tune": "Set to false on a brain where you do not want this at all.",
+        "signals": [
+          {
+            "id": "illegal-lexicon",
+            "kind": "lexicon",
+            "weight": 1.0,
+            "terms": [
+              "money laundering", "shell company", "bribe", "bribery",
+              "evade tax", "tax evasion", "sanctions evasion", "kickback",
+              "insider trading", "launder", "proceeds of crime"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

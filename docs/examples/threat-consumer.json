@@ -1,0 +1,75 @@
+{
+  "_comment": [
+    "Personal mail profile: one person's own mailbox.",
+    "",
+    "You do not need this file. It is the built-in behaviour, written out so",
+    "you can see what you are starting from and change one thing at a time.",
+    "",
+    "Compared with the enterprise profile: nothing here fires on ordinary",
+    "personal mail. 'invoice', 'receipt' and 'meeting' are deliberately absent",
+    "-- they appear constantly in harmless mail, so including them would make",
+    "the alerts useless."
+  ],
+
+  "threat": {
+    "credential_terms": [
+      "login", "log in", "sign in", "verify", "password", "credential",
+      "2fa", "one-time"
+    ],
+    "brands": [
+      "adobe", "microsoft", "apple", "google", "amazon", "paypal",
+      "dhl", "fedex"
+    ],
+    "categories": [
+      {
+        "tag": "phishing",
+        "priority": 100,
+        "threshold": 1.0,
+        "_what": "A message trying to steal your credentials.",
+        "signals": [
+          {"id": "credential-link", "kind": "credential_link", "weight": 1.0},
+          {"id": "ip-link", "kind": "ip_link", "weight": 1.0},
+          {"id": "punycode-link", "kind": "punycode_link", "weight": 1.0}
+        ]
+      },
+      {
+        "tag": "scam",
+        "priority": 90,
+        "threshold": 2.0,
+        "_what": "Financial fraud. Needs BOTH a scam phrase AND an unfamiliar sender.",
+        "_tune": "Drop threshold to 1.0 to catch scam phrases from known senders too.",
+        "signals": [
+          {
+            "id": "scam-lexicon",
+            "kind": "lexicon",
+            "weight": 1.0,
+            "terms": [
+              "beneficiar", "inheritance", "advance fee", "overdue invoice",
+              "wire transfer", "gift cards", "crypto wallet",
+              "private key", "recovery phrase", "nigerian", "prince"
+            ]
+          },
+          {"id": "new-sender", "kind": "new_sender", "weight": 1.0}
+        ]
+      },
+      {
+        "tag": "spam",
+        "priority": 80,
+        "threshold": 1.0,
+        "_what": "Bulk junk.",
+        "signals": [
+          {
+            "id": "spam-lexicon",
+            "kind": "lexicon",
+            "weight": 1.0,
+            "terms": [
+              "enlargement", "viagra", "cialis", "crypto giveaway",
+              "double your", "lottery win", "lottery prize",
+              "miracle cure", "miracle pills"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
