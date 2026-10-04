@@ -32,6 +32,7 @@ from . import (
                doctor,
                info,
                ingest,
+               ingest_log,
                init,
                llm_setup,
                llm_stat,
@@ -45,5 +46,5 @@ from . import (
 )
 
 __all__ = ["ask", "brain_test", "config", "consolidate", "delete", "doctor",
-           "info", "ingest", "init", "llm_setup", "llm_stat", "prune",
+           "info", "ingest", "ingest_log", "init", "llm_setup", "llm_stat", "prune",
            "query", "recall", "stats", "tag", "update", "wake"]

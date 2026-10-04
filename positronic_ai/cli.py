@@ -43,6 +43,7 @@ OPS = {
     "prune": ops.prune.run,
     "consolidate": ops.consolidate.run,
     "ingest": ops.ingest.run,
+    "ingest-log": ops.ingest_log.run,
     "recall": ops.recall.run,
     "ask": ops.ask.run,
     "tag": ops.tag.run,
@@ -56,7 +57,8 @@ _VALUE_FLAGS = {"brain", "k", "sql", "cue", "text", "arousal", "tier",
                 "status", "tail", "pin", "value", "key", "profile", "embed",
                 "auto-consolidate", "auto-prune", "role", "consolidation",
                 "context", "tag", "episode-id", "episode", "message-id",
-                "axis", "wall-now", "object", "since", "until", "stream"}
+                "axis", "wall-now", "object", "since", "until", "stream",
+                "schema", "file", "domain", "limit"}
 
 
 def _parse(argv) -> tuple[list[str], dict]:
@@ -198,6 +200,18 @@ def _run(verb, dir, args, flags) -> dict:
                              arousal=_float(flags, "arousal", 0.5),
                              dedup=(_flag(flags, "dedup") if "dedup" in flags else None),
                              role=role)
+    if verb == "ingest-log":
+        return OPS["ingest-log"](dir, schema=flags.get("schema"),
+                                 file=flags.get("file"),
+                                 brain=_brain(flags),
+                                 domain=flags.get("domain"),
+                                 stream=flags.get("stream"),
+                                 since=flags.get("since"),
+                                 until=flags.get("until"),
+                                 limit=_int(flags, "limit", None),
+                                 dry_run=_flag(flags, "dry-run"),
+                                 skip_validate=_flag(flags,
+                                                     "skip-validate"))
     if verb == "recall":
         cons = flags.get("consolidation")
         if cons not in (None, "only", "first"):

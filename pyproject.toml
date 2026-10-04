@@ -10,6 +10,10 @@ license = "AGPL-3.0-or-later OR LicenseRef-Commercial"
 requires-python = ">=3.10"
 dependencies = [
   "memeng @ git+https://github.com/ShingWong/positronic-engram.git@v0.2.1#subdirectory=engine",
+  # Pinned to the commit that adds logschema.classify (public record->class
+  # API). Bump deliberately: floating on master would move the classifier
+  # under the ingester without review.
+  "positronic-logschema @ git+https://github.com/ShingWong/positronic-logschema.git@044b13367099f03d0bd920becea1eac0458fc12f",
 ]
 
 [project.optional-dependencies]
