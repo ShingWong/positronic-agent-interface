@@ -49,3 +49,36 @@ def test_prune_live_false_skips():
         out = prune(d)
         assert out["_note"] == "live=false — pruning disabled"
         assert "expired" not in out
+def test_prune_rejects_unknown_axis():
+    """An unknown decay axis fails loud, before touching the brain. Silently
+    pruning on the wrong clock would expire what the caller meant to keep."""
+    import tempfile
+
+    import pytest
+
+    from positronic_ai.brains import init_brain
+    from positronic_ai.ops.prune import run as prune
+    with tempfile.TemporaryDirectory() as d:
+        init_brain(d, "kairos", "balanced", "lexical")
+        with pytest.raises(ValueError, match="unknown decay_axis"):
+            prune(d, decay_axis="fortnights")
+
+
+def test_prune_wall_axis_runs():
+    """The wall axis is reachable through the verb: fresh ingest survives a
+    wall prune at its own wall_now (age ~0 days), proving the flag reaches
+    the engine rather than being swallowed by dispatch."""
+    import tempfile
+
+    from positronic_ai.brains import init_brain
+    from positronic_ai.ops.ingest import run as ingest
+    from positronic_ai.ops.prune import run as prune
+    with tempfile.TemporaryDirectory() as d:
+        init_brain(d, "kairos", "balanced", "lexical")
+        for i in range(5):
+            ingest(d, f"wall axis probe {i}: distinct harbor manifest note {i}",
+                   arousal=0.0)
+        import time
+        rep = prune(d, decay_axis="wall", wall_now=time.time())
+        assert rep["scanned"] >= 5
+        assert rep["expired"] == 0

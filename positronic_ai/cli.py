@@ -55,7 +55,8 @@ USAGE = "positronic <verb> [args]\nverbs: " + " | ".join(OPS)
 _VALUE_FLAGS = {"brain", "k", "sql", "cue", "text", "arousal", "tier",
                 "status", "tail", "pin", "value", "key", "profile", "embed",
                 "auto-consolidate", "auto-prune", "role", "consolidation",
-                "context", "tag", "episode-id", "episode", "message-id"}
+                "context", "tag", "episode-id", "episode", "message-id",
+                "axis", "wall-now"}
 
 
 def _parse(argv) -> tuple[list[str], dict]:
@@ -178,7 +179,9 @@ def _run(verb, dir, args, flags) -> dict:
                             k=_int(flags, "k", 8), consolidation=cons,
                             context_window=_int(flags, "context", 0))
     if verb == "prune":
-        return OPS["prune"](dir, brain=_brain(flags))
+        return OPS["prune"](dir, brain=_brain(flags),
+                            decay_axis=flags.get("axis", "tau"),
+                            wall_now=_float(flags, "wall-now", None))
     if verb == "consolidate":
         return OPS["consolidate"](dir, _text(args, flags), brain=_brain(flags),
                                   arousal=_float(flags, "arousal", 0.4))
