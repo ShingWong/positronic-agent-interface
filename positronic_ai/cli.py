@@ -56,7 +56,7 @@ _VALUE_FLAGS = {"brain", "k", "sql", "cue", "text", "arousal", "tier",
                 "status", "tail", "pin", "value", "key", "profile", "embed",
                 "auto-consolidate", "auto-prune", "role", "consolidation",
                 "context", "tag", "episode-id", "episode", "message-id",
-                "axis", "wall-now"}
+                "axis", "wall-now", "object", "since", "until", "stream"}
 
 
 def _parse(argv) -> tuple[list[str], dict]:
@@ -177,7 +177,12 @@ def _run(verb, dir, args, flags) -> dict:
                             anchors=_flag(flags, "anchors"),
                             sightings=_flag(flags, "sightings"),
                             k=_int(flags, "k", 8), consolidation=cons,
-                            context_window=_int(flags, "context", 0))
+                            context_window=_int(flags, "context", 0),
+                            object_ref=flags.get("object"),
+                            range_=_flag(flags, "range"),
+                            since=flags.get("since"),
+                            until=flags.get("until"),
+                            stream=flags.get("stream"))
     if verb == "prune":
         return OPS["prune"](dir, brain=_brain(flags),
                             decay_axis=flags.get("axis", "tau"),

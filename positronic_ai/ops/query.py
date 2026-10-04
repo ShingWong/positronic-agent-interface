@@ -36,7 +36,9 @@ from ..config import load_config
 from ..engine import open_engine
 
 USAGE = ("positronic query <text> --brain <name> --k <n> | --sql <SQL> "
-         "| --cue <text> | --anchors | --objects | --sightings")
+         "| --cue <text> | --anchors | --objects | --sightings "
+         "| --object <kind:canonical> [--since <iso> --until <iso>] "
+         "| --range [--since <iso> --until <iso>] [--stream <name>]")
 
 _ANCHORS_SQL = ("SELECT substr(id,1,12) id,round(tau,2) tau,kind,"
                 "substr(subject_norm,1,80) sn FROM episode WHERE is_anchor=1 "
@@ -66,9 +68,30 @@ def _human(parsed) -> str:
         return "\n".join(lines)
     return json.dumps(parsed, default=str)[:200]
 
+def _human_object(res) -> str:
+    """One identity's life in a glance: count, span, handoffs.
+
+    Unknown identity is a fact about the data, not a failure -- the engine
+    returns found:False for exactly this reason, and the human line says so
+    instead of echoing an empty list.
+    """
+    kind, canonical = res.get("kind"), res.get("canonical")
+    if not res.get("found"):
+        return f"(unknown identity {kind}:{canonical})"
+    eps = res.get("episodes") or []
+    walls = [ep.get("wall") for ep in eps if ep.get("wall")]
+    span = f"{walls[0][:10]}..{walls[-1][:10]}" if walls else "?"
+    lines = [f"{kind} {canonical}: {len(eps)} episodes, {span}"]
+    for label in ("carried_by", "carried"):
+        names = res.get(label) or []
+        if names:
+            lines.append(f"  {label}: {', '.join(names[:8])}")
+    return "\n".join(lines)
+
 def run(dir, *, brain=None, text=None, sql=None, cue=None,
         objects=False, anchors=False, sightings=False, k=8,
-        consolidation=None, context_window=0) -> dict:
+        consolidation=None, context_window=0, object_ref=None,
+        range_=False, since=None, until=None, stream=None) -> dict:
     brain = brain or next(iter(load_config(dir).get("brains", {})), None) or "kairos"
     k = k or 8
     try:
@@ -79,6 +102,43 @@ def run(dir, *, brain=None, text=None, sql=None, cue=None,
 
     if sql:
         rows = [dict(r) for r in s.conn.execute(sql).fetchall()]
+    elif object_ref:
+        # Range-and-key first: one identity's life in wall order, no ranking.
+        # The ref is kind:canonical with the split on the FIRST colon,
+        # because canonicals themselves contain colons (message:queue:Q1).
+        # A bare name with no kind is a guess about what the caller meant,
+        # and guessing an identity is how the wrong dossier gets read.
+        if ":" not in object_ref:
+            raise ValueError(
+                f"--object must be kind:canonical, got {object_ref!r}")
+        kind, canonical = object_ref.split(":", 1)
+        res = e.recall_object(kind, canonical, stream=stream,
+                              since=since, until=until, limit=k)
+        out = {"ok": True, "brain": brain, **res}
+        out["human"] = _human_object(res)
+        return out
+    elif range_:
+        # A window is a bound, not a ranking: oldest-first narrative order,
+        # straight from the store. Unbounded --range reads from the
+        # beginning; the limit (default --k) is what keeps it honest.
+        ids = s.episodes_in_range(stream=stream, since=since, until=until,
+                                 limit=k)
+        rows = []
+        for eid in ids:
+            ep = s.get_episode(eid)
+            if ep is None:
+                continue
+            feats = ep.features or {}
+            rows.append({
+                "episode_id": eid,
+                "wall": ep.wall.isoformat() if hasattr(ep.wall, "isoformat")
+                        else str(ep.wall),
+                "tau": ep.tau,
+                "stream": ep.stream,
+                "subject_norm": ep.subject_norm
+                                or (feats.get("body_text")
+                                    or feats.get("message") or "")[:80],
+            })
     elif anchors:
         rows = [dict(r) for r in s.conn.execute(_ANCHORS_SQL.format(k)).fetchall()]
     elif sightings:
@@ -94,7 +154,10 @@ def run(dir, *, brain=None, text=None, sql=None, cue=None,
             return {"ok": True, "help": True, "usage": USAGE,
                     "human": ("usage: positronic query <text> | --sql <SQL> "
                               "| --cue <text> | --anchors | --objects | "
-                              "--sightings [--brain kairos] [--k 8] "
+                              "--sightings | --object <kind:canonical> | "
+                              "--range [--brain kairos] [--k 8] "
+                              "[--since <iso> --until <iso>] "
+                              "[--stream <name>] "
                               "[--consolidation only|first]")}
         t0 = time.perf_counter()
         hits = e.activate({"text": qtext}, k=k, consolidation=consolidation,
