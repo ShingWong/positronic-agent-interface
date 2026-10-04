@@ -114,8 +114,52 @@ def run(dir, *, brain=None, text=None, sql=None, cue=None,
         kind, canonical = object_ref.split(":", 1)
         res = e.recall_object(kind, canonical, stream=stream,
                               since=since, until=until, limit=k)
-        out = {"ok": True, "brain": brain, **res}
-        out["human"] = _human_object(res)
+        if res.get("found"):
+            out = {"ok": True, "brain": brain, **res}
+            out["human"] = _human_object(res)
+            return out
+        # Exact identity missed: fall back to the candidate list, never a
+        # guess. One candidate opens with resolved_from disclosed; several
+        # come back as "did you mean...?"; none in this kind retries
+        # unscoped, because the kind itself may be what the caller
+        # misremembered (msg:Q1 vs message:queue:Q1).
+        from ..objects import candidate_objects
+        cands = candidate_objects(s, canonical, kind=kind)
+        if len(cands) == 1:
+            c = cands[0]
+            res = e.recall_object(c["kind"], c["canonical_name"],
+                                  stream=stream, since=since, until=until,
+                                  limit=k)
+            out = {"ok": True, "brain": brain,
+                   "resolved_from": object_ref, **res}
+            out["human"] = (f"(resolved {object_ref} → "
+                            f"{c['kind']}:{c['canonical_name']})\n"
+                            + _human_object(res))
+            return out
+        if not cands:
+            cands = candidate_objects(s, canonical)
+            note = (f"no {kind} matching {canonical!r}") if cands else None
+        else:
+            note = None
+        listed = [{"kind": c["kind"], "canonical": c["canonical_name"]}
+                  for c in cands[:10]]
+        # episodes: [] keeps the not-found contract recall_object sets:
+        # absence is information with a stable shape, not a missing key.
+        out = {"ok": True, "brain": brain, "found": False,
+               "kind": kind, "canonical": canonical, "episodes": [],
+               "candidates": listed}
+        if note:
+            out["note"] = note + "; did you mean one of these?"
+            out["human"] = f"(unknown identity {kind}:{canonical}; " \
+                           f"did you mean: " \
+                           + ", ".join(f"{c['kind']}:{c['canonical']}"
+                                       for c in listed) + "?)"
+        elif listed:
+            out["human"] = f"(ambiguous {kind}:{canonical}; did you mean: " \
+                           + ", ".join(f"{c['kind']}:{c['canonical']}"
+                                       for c in listed) + "?)"
+        else:
+            out["human"] = f"(unknown identity {kind}:{canonical})"
         return out
     elif range_:
         # A window is a bound, not a ranking: oldest-first narrative order,

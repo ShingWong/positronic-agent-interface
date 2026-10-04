@@ -50,6 +50,21 @@ _CONSOLIDATION_SQL = ("SELECT COALESCE(e.subject_norm, "
                       "JOIN episode e ON os.episode_id=e.id "
                       "WHERE os.object_id = ? AND e.kind='consolidation' "
                       "ORDER BY e.tau ASC LIMIT 1")
+def _bounds(name: str):
+    """Token-boundary matcher shared by resolve and candidates.
+
+    Bounded on both sides, so mid-word substrings never match ('shing'
+    must not hit 'bashing', 'sys' must not hit 'system'). `:` and `/` count
+    as boundaries alongside whitespace/hyphen/underscore: log identities
+    are structured as ident:pid and kind:queue (postfix/submission/smtpd
+    :28801), and the pid or queue suffix IS the token operators search by.
+    For entity names (no colons or slashes in practice) this changes
+    nothing -- keep the two call sites on this helper so they cannot drift.
+    """
+    return _re.compile(r"(^|[\s\-_:/])" + _re.escape(name)
+                       + r"($|[\s\-_:/])", _re.IGNORECASE)
+
+
 _DIGEST_SQL = ("SELECT COUNT(*) AS sighting_count, "
                "COALESCE(MIN(e.tau),0.0) AS oldest_tau, "
                "COALESCE(MAX(e.tau),0.0) AS latest_tau "
@@ -62,8 +77,9 @@ def resolve_object(store, object_name: str) -> dict | None:
     Matches the exact name, a whole-token substring, or a
     hyphen/underscore-normalized variant (entity extraction hyphenates
     'opencode plugin'; agents cue with spaces). Exact match ranks first.
-    The match must be bounded on *both* sides, so mid-word substrings never
-    match ('shing' must not hit 'bashing', and 'sys' must not hit 'system').
+    Token boundaries are `_bounds` (whitespace, hyphen, underscore, colon,
+    slash): the colon/slash matter for log identities, where the searchable
+    token is a pid or queue suffix after a separator.
     """
     object_name = (object_name or "").strip()
     if not object_name:
@@ -77,8 +93,7 @@ def resolve_object(store, object_name: str) -> dict | None:
         (object_name, like, like, object_name)).fetchall()
     if not rows:
         return None
-    boundary = _re.compile(r"(^|[\s\-_])" + _re.escape(object_name)
-                           + r"($|[\s\-_])", _re.IGNORECASE)
+    boundary = _bounds(object_name)
     for row in rows:
         hit = dict(row)
         if hit["canonical_name"] == object_name:
@@ -87,6 +102,44 @@ def resolve_object(store, object_name: str) -> dict | None:
         if boundary.search(hit["canonical_name"]) or boundary.search(norm):
             return hit
     return None
+
+def candidate_objects(store, name: str, kind: str | None = None,
+                      limit: int = 10) -> list[dict]:
+    """Every object a fuzzy name could mean, exact-first, boundary-filtered.
+
+    The list behind `--object`'s front door: resolve_object answers
+    one-or-none, which cannot say "did you mean...?" when it is ambiguous.
+    Same token-boundary rule (mid-word substrings never match), same
+    ranking, but returns ALL matches up to `limit` with their kinds, so the
+    caller lists instead of guessing. `kind` scopes the search; None
+    searches every kind (the cross-kind "did you mean message:...?" retry).
+    """
+    name = (name or "").strip()
+    if not name:
+        return []
+    like = f"%{name}%"
+    q = ("SELECT kind, canonical_name FROM object "
+         "WHERE (canonical_name = ? OR canonical_name LIKE ? "
+         "OR REPLACE(REPLACE(canonical_name,'-',' '),'_',' ') LIKE ?)")
+    args: list = [name, like, like]
+    if kind is not None:
+        q += " AND kind = ?"
+        args.append(kind)
+    q += " ORDER BY (canonical_name = ?) DESC, canonical_name ASC LIMIT ?"
+    args += [name, limit + 1]
+    boundary = _bounds(name)
+    out = []
+    for row in store.conn.execute(q, args).fetchall():
+        hit = dict(row)
+        if hit["canonical_name"] != name:
+            norm = hit["canonical_name"].replace("-", " ").replace("_", " ")
+            if not (boundary.search(hit["canonical_name"])
+                    or boundary.search(norm)):
+                continue
+        out.append(hit)
+        if len(out) >= limit:
+            break
+    return out
 
 def object_sightings(store, object_id: str) -> list[dict]:
     """Full τ-ordered dossier for one object (dig-deeper payload)."""

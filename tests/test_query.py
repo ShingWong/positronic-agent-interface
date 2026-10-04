@@ -144,3 +144,96 @@ def test_query_range_window_and_bounds():
         assert walls == sorted(walls), "a window is a narrative: oldest first"
         assert run(d, range_=True, since="2999-01-01")["results"] == []
         assert run(d, range_=True, until="2000-01-01")["results"] == []
+
+
+def _seed_aliases(d):
+    """Two similarly-named sessions plus an unrelated one, all distinct
+    enough to encode side by side."""
+    from datetime import datetime, timezone
+
+    from memeng.models import Event
+
+    from positronic_ai.brains import init_brain
+    from positronic_ai.engine import open_engine
+    init_brain(d, "kairos", "balanced", "lexical")
+    _s, e = open_engine(d, "kairos")
+    notes = (("backup-mx1", "zebra invoice reconciled at midnight"),
+             ("backup-mx2", "quarry siren tested before dawn"),
+             ("lighthouse-log", "harbor manifest sealed at noon"))
+    for i, (canon, txt) in enumerate(notes):
+        e.new_event(Event(
+            stream="kairos:in", kind="message",
+            wall=datetime(2026, 5, 1 + i, tzinfo=timezone.utc),
+            persons=[], objects=[("session", canon)],
+            features={"subject_norm": txt, "body_text": txt,
+                      "arousal": 0.0}))
+
+def test_query_object_substring_resolves_single(tmp_path):
+    import tempfile
+
+    from positronic_ai.ops.query import run
+    with tempfile.TemporaryDirectory() as d:
+        _seed_aliases(d)
+        out = run(d, object_ref="session:lighthouse")
+        assert out["ok"] is True and out["found"] is True
+        assert out["canonical"] == "lighthouse-log"
+        assert out["resolved_from"] == "session:lighthouse"
+        assert "resolved" in out["human"]
+
+def test_query_object_ambiguous_lists_candidates(tmp_path):
+    """Two matches open neither dossier: the caller picks, the tool lists."""
+    import tempfile
+
+    from positronic_ai.ops.query import run
+    with tempfile.TemporaryDirectory() as d:
+        _seed_aliases(d)
+        out = run(d, object_ref="session:backup")
+        assert out["ok"] is True and out["found"] is False
+        got = {(c["kind"], c["canonical"]) for c in out["candidates"]}
+        assert got == {("session", "backup-mx1"),
+                       ("session", "backup-mx2")}
+        assert "did you mean" in out["human"]
+        assert out["episodes"] == []
+
+def test_query_object_wrong_kind_suggests_across_kinds(tmp_path):
+    """The kind itself may be misremembered: no message matches, but the
+    session does -- suggest it, still open nothing."""
+    import tempfile
+
+    from positronic_ai.ops.query import run
+    with tempfile.TemporaryDirectory() as d:
+        _seed_aliases(d)
+        out = run(d, object_ref="message:backup-mx1")
+        assert out["ok"] is True and out["found"] is False
+        assert any(c == {"kind": "session", "canonical": "backup-mx1"}
+                   for c in out["candidates"])
+        assert "did you mean" in out["human"]
+
+def test_query_object_midword_never_matches(tmp_path):
+    """'ack' must not hit 'backup-mx1': the boundary rule holds for the
+    candidate list exactly as for resolve_object."""
+    import tempfile
+
+    from positronic_ai.ops.query import run
+    with tempfile.TemporaryDirectory() as d:
+        _seed_aliases(d)
+        out = run(d, object_ref="session:ack")
+        assert out["found"] is False
+        assert out.get("candidates") == []
+
+
+def test_query_object_pid_suffix_resolves(tmp_path):
+    """Log identities are ident:pid; the pid after the colon IS the token
+    operators search by, so ':' must be a boundary. Tightening the boundary
+    back to whitespace-only silently breaks the primary diagnostic lookup."""
+    import tempfile
+
+    from positronic_ai.ops.query import run
+    with tempfile.TemporaryDirectory() as d:
+        _seed_object(d)
+        out = run(d, object_ref="session:s:1")
+        assert out["ok"] is True and out["found"] is True
+        out2 = run(d, object_ref="session:1")
+        assert out2["ok"] is True and out2["found"] is True
+        assert out2["canonical"] == "s:1"
+        assert out2["resolved_from"] == "session:1"
