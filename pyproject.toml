@@ -9,7 +9,7 @@ description = "Polytemporal memory agent interface over memeng"
 license = "AGPL-3.0-or-later OR LicenseRef-Commercial"
 requires-python = ">=3.10"
 dependencies = [
-  "memeng @ git+https://github.com/ShingWong/positronic-engram.git@v0.2.1#subdirectory=engine",
+  "memeng @ git+https://github.com/ShingWong/positronic-engram.git@v0.3.0#subdirectory=engine",
   # Pinned to the commit that adds logschema.classify (public record->class
   # API). Bump deliberately: floating on master would move the classifier
   # under the ingester without review.
