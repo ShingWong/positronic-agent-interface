@@ -99,3 +99,57 @@ def test_delete_unknown_brain_warns():
         out = delete_run(d, brain="ghost", force=True)
         assert out["ok"] is False
         assert "No brain named" in out["warning"]
+
+def test_init_from_db_adopts_store_intact():
+    """The adopted brain answers from the source's episodes, and the source
+    file is untouched (copied, never moved)."""
+    import os
+
+    from positronic_ai.brains import init_brain
+    from positronic_ai.ops.query import run as query
+    with tempfile.TemporaryDirectory() as d, \
+            tempfile.TemporaryDirectory() as src:
+        init_brain(src, "donor", "balanced", "lexical")
+        from positronic_ai.ops.ingest import run as ingest
+        ingest(src, "adopted brain probe event alpha")
+        before = os.path.getsize(
+            os.path.join(src, ".positronic", "brains", "donor", "memory.db"))
+        out = wizard_init_run(d, brains=[{**BRAIN,
+                                          "from_db": os.path.join(
+                                              src, ".positronic", "brains",
+                                              "donor", "memory.db")}])
+        assert out["ok"] is True
+        assert out["created"] == ["kairos"]
+        after = os.path.getsize(
+            os.path.join(src, ".positronic", "brains", "donor", "memory.db"))
+        assert before == after
+        q = query(d, text="adopted brain probe")
+        assert q["hits"] >= 1
+
+
+def test_init_from_db_rejects_non_store(tmp_path):
+    """A random sqlite file must not become a brain that fails on first
+    query: rejected at adopt time, with nothing registered."""
+    import sqlite3
+
+    bogus = tmp_path / "bogus.db"
+    c = sqlite3.connect(str(bogus))
+    c.execute("CREATE TABLE other(x)")
+    c.commit()
+    c.close()
+    import pytest
+
+    with pytest.raises(ValueError, match="no episode table"):
+        wizard_init_run(str(tmp_path),
+                        brains=[{**BRAIN, "from_db": str(bogus)}])
+    from positronic_ai.config import load_config
+    assert "kairos" not in load_config(str(tmp_path)).get("brains", {})
+
+
+def test_init_from_db_rejects_missing_file(tmp_path):
+    import pytest
+
+    with pytest.raises(ValueError, match="not a readable sqlite"):
+        wizard_init_run(str(tmp_path),
+                        brains=[{**BRAIN,
+                                 "from_db": str(tmp_path / "nope.db")}])

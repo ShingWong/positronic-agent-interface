@@ -26,7 +26,7 @@
 import logging
 from pathlib import Path
 
-from .brains import init_brain
+from .brains import adopt_brain, init_brain
 from .config import ENGRAM_TAG, load_config, save_config
 
 log = logging.getLogger(__name__)
@@ -103,7 +103,15 @@ def init_run(dir, *, brains=None, force=False, live=None,
 
     new_brains = {}
     for a in answers:
-        init_brain(dir, a["name"], a["profile"], a["embed"])
+        # Adopt, don't create: --from-db names an existing store for this
+        # brain. One flag, one brain -- spreading a single file across
+        # several names is ambiguous, so the CLI rejects that combination
+        # before it gets here.
+        if a.get("from_db"):
+            adopt_brain(dir, a["name"], a["profile"], a["from_db"],
+                        a["embed"])
+        else:
+            init_brain(dir, a["name"], a["profile"], a["embed"])
         import sqlite3 as _sql
         try:
             _c = _sql.connect(str(Path(dir) / ".positronic" / "brains"

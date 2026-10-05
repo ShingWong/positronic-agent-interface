@@ -27,6 +27,7 @@
 Consumes memeng (SQLiteStore, MemoryEngine) via PYTHONPATH; config update
 goes through positronic_ai.config. No hardcoded sys.path.
 """
+import logging
 from pathlib import Path
 
 from memeng.engine import MemoryEngine
@@ -38,6 +39,8 @@ from .config import (
     load_config,
     save_config,
 )
+
+log = logging.getLogger(__name__)
 
 
 def init_brain(project_dir, name: str, profile: str, embed: str = "lexical", threshold=None) -> str:
@@ -71,6 +74,15 @@ def init_brain(project_dir, name: str, profile: str, embed: str = "lexical", thr
     s.conn.commit()
 
     # update config
+    _register_brain_config(project_dir, name, profile, embed, str(db_path),
+                           brain_uuid, threshold)
+    return str(db_path)
+
+
+def _register_brain_config(project_dir, name: str, profile: str, embed: str,
+                           db_path: str, brain_uuid: str,
+                           threshold=None) -> None:
+    """Config tail shared by init and adopt: stable UUID + brain entry."""
     cfg = load_config(project_dir)
     existing = (cfg.get("brains") or {}).get(name) or {}
     # Keep a stable UUID: reuse the stored one, else the new DB one.
@@ -91,4 +103,60 @@ def init_brain(project_dir, name: str, profile: str, embed: str = "lexical", thr
         cfg["brains"][name]["threshold"] = threshold
     save_config(project_dir, cfg)
 
+
+def adopt_brain(project_dir, name: str, profile: str, from_db: str,
+                embed: str = "lexical") -> str:
+    """Adopt an existing memory.db as a brain instead of creating empty.
+
+    The source is COPIED, never moved: forensic sources stay pristine and
+    the brain owns its file (no cross-directory locking surprises). The
+    copy is verified to be a memeng store (episode table present) BEFORE
+    registration -- a random sqlite file must not become a brain that then
+    fails on first query. Migrations run on open (init_database), and a
+    missing brain_uuid is minted, so stores predating UUIDs adopt cleanly.
+    Returns path to the adopted memory.db as string.
+    """
+    import shutil
+    import sqlite3 as _sql
+    import uuid as _uuid
+
+    if profile not in ALLOWED_PROFILES:
+        raise ValueError(f"unknown retention profile: {profile}")
+    if embed not in ALLOWED_EMBEDS:
+        raise ValueError(f"unknown embed choice: {embed}")
+    src = str(from_db)
+    try:
+        _c = _sql.connect(f"file:{src}?mode=ro", uri=True)
+        try:
+            has = _c.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name='episode'").fetchone()
+        finally:
+            _c.close()
+    except Exception as ex:
+        raise ValueError(f"not a readable sqlite database: {src}") from ex
+    if not has:
+        raise ValueError(f"not a memeng store (no episode table): {src}")
+
+    p = Path(project_dir) / ".positronic" / "brains" / name
+    p.mkdir(parents=True, exist_ok=True)
+    db_path = p / "memory.db"
+    shutil.copy2(src, db_path)
+
+    s = SQLiteStore(str(db_path))
+    e = MemoryEngine(s)
+    e.init_database()
+    brain_uuid = str(_uuid.uuid7() if hasattr(_uuid, "uuid7") else _uuid.uuid4())
+    try:
+        row = s.conn.execute(
+            "SELECT v FROM meta WHERE k='brain_uuid'").fetchone()
+        if not row:
+            s.conn.execute(
+                "INSERT INTO meta(k, v) VALUES('brain_uuid', ?)",
+                (brain_uuid,))
+            s.conn.commit()
+    except Exception:  # noqa: BLE001 -- adopted store predates the meta table
+        log.debug("adopt: no meta table in %s; uuid minted fresh", src)
+    _register_brain_config(project_dir, name, profile, embed, str(db_path),
+                           brain_uuid)
     return str(db_path)

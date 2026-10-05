@@ -58,7 +58,7 @@ _VALUE_FLAGS = {"brain", "k", "sql", "cue", "text", "arousal", "tier",
                 "auto-consolidate", "auto-prune", "role", "consolidation",
                 "context", "tag", "episode-id", "episode", "message-id",
                 "axis", "wall-now", "object", "since", "until", "stream",
-                "schema", "file", "domain", "limit"}
+                "schema", "file", "domain", "limit", "from-db"}
 
 
 def _parse(argv) -> tuple[list[str], dict]:
@@ -129,7 +129,16 @@ def _run(verb, dir, args, flags) -> dict:
         names = flags.get("brain") or []
         profile = flags.get("profile") or "balanced"
         embed = flags.get("embed") or "lexical"
-        brains = [{"name": n, "profile": profile, "embed": embed} for n in names]
+        from_db = flags.get("from-db")
+        if "from-db" in flags and from_db in (None, True, False):
+            raise ValueError("--from-db needs a path to a memory.db")
+        if from_db not in (None, True, False) and len(names) != 1:
+            raise ValueError(
+                "--from-db names one store for one brain: pass exactly one "
+                f"--brain, got {len(names)}")
+        brains = [{"name": n, "profile": profile, "embed": embed,
+                   **({"from_db": from_db} if from_db not in
+                      (None, True, False) else {})} for n in names]
         live = None
         if "live" in flags:
             live = _flag(flags, "live")
