@@ -237,3 +237,53 @@ def test_query_object_pid_suffix_resolves(tmp_path):
         assert out2["ok"] is True and out2["found"] is True
         assert out2["canonical"] == "s:1"
         assert out2["resolved_from"] == "session:1"
+
+
+def test_query_sql_write_refused(tmp_path):
+    """The pairing caller is stochastic: DELETE/UPDATE/DROP never reach the
+    connection, and the refusal names what was attempted."""
+    import tempfile
+
+    import pytest
+
+    from positronic_ai.ops.query import run
+    with tempfile.TemporaryDirectory() as d:
+        _seed(d)
+        for stmt in ("DELETE FROM episode",
+                     "DROP TABLE episode",
+                     "UPDATE episode SET tau=0",
+                     "SELECT id FROM episode; DROP TABLE episode",
+                     "WITH x AS (SELECT 1) DELETE FROM episode"):
+            with pytest.raises(ValueError, match="[Rr]ead|single"):
+                run(d, sql=stmt)
+        n = run(d, sql="SELECT COUNT(*) c FROM episode")["results"]
+        assert n == [{"c": 3}]
+
+
+def test_query_sql_reads_allowed(tmp_path):
+    import tempfile
+
+    from positronic_ai.ops.query import run
+    with tempfile.TemporaryDirectory() as d:
+        _seed(d)
+        assert run(d, sql="select COUNT(*) c from episode")["ok"] is True
+        assert run(d, sql="WITH x AS (SELECT 1 AS a) SELECT a FROM x",
+                   )["results"] == [{"a": 1}]
+        assert run(d, sql="PRAGMA table_info(episode)")["ok"] is True
+
+
+def test_query_describe_maps_the_store(tmp_path):
+    """The pairing map: real tables/columns (PRAGMA, not hardcoded), JSON
+    key conventions from a sample, counts, and runnable examples."""
+    import tempfile
+
+    from positronic_ai.ops.query import run
+    with tempfile.TemporaryDirectory() as d:
+        _seed(d)
+        out = run(d, describe=True)
+        assert out["ok"] is True
+        assert "episode" in out["tables"] and "tau" in out["tables"]["episode"]
+        assert "object" in out["tables"]
+        assert out["counts"]["episodes_by_level"]
+        assert len(out["examples"]) == 3
+        assert "features_json" in out["human"]

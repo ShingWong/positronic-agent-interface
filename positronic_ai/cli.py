@@ -189,6 +189,7 @@ def _run(verb, dir, args, flags) -> dict:
                             sightings=_flag(flags, "sightings"),
                             k=_int(flags, "k", 8), consolidation=cons,
                             context_window=_int(flags, "context", 0),
+                            describe=_flag(flags, "describe"),
                             object_ref=flags.get("object"),
                             range_=_flag(flags, "range"),
                             since=flags.get("since"),
