@@ -32,7 +32,7 @@ def test_info_shape():
         init_brain(d, "kairos", "balanced", "lexical")
         out = run(d)
         assert out["version"] == positronic_ai.__version__
-        assert out["engram_tag"] == "v0.2.0"
+        assert out["engram_tag"] == "v0.3.0"
         assert "kairos" in out["brains"]
         assert set(out["tiers"].keys()) == {"engram", "bge", "llama", "lexical"}
 

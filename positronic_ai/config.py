@@ -28,7 +28,7 @@ from pathlib import Path
 
 ALLOWED_PROFILES = {"balanced", "archival", "long_term", "short_term"}
 ALLOWED_EMBEDS = {"lexical", "local", "remote"}
-ENGRAM_TAG = "v0.2.0"
+ENGRAM_TAG = "v0.3.0"
 CONFIG_KEYS = {"profile", "embed", "threshold", "live",
                "local_url", "remote_url", "remote_key", "engram_tag",
                "vision_url",

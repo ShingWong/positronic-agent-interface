@@ -28,7 +28,7 @@ def test_defaults():
     from positronic_ai.config import load_config
     with tempfile.TemporaryDirectory() as d:
         cfg = load_config(d)
-        assert cfg["live"] is True and cfg["engram_tag"] == "v0.2.0"
+        assert cfg["live"] is True and cfg["engram_tag"] == "v0.3.0"
 
 def test_set_live_roundtrip():
     import tempfile
