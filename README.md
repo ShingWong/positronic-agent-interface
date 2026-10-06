@@ -96,7 +96,7 @@ pip install "git+https://github.com/ShingWong/positronic-agent-interface.git"
 ```
 
 This installs the `positronic` console script plus the `positronic_ai` package (`memeng` is pulled
-in at `v0.2.0`).
+in at `v0.3.0`, `positronic-logschema` at the pinned commit in `pyproject.toml`).
 
 ---
 
@@ -115,7 +115,7 @@ positronic stats                       # per-brain episode counts
 
 | Verb | Purpose |
 |------|---------|
-| `init` | create `.positronic/config.json` + brains (`--brain NAME`, `--profile`, `--embed lexical\|local\|remote`, `--live/--no-live`, `--force`) |
+| `init` | create `.positronic/config.json` + brains (`--brain NAME`, `--profile`, `--embed lexical\|local\|remote`, `--live/--no-live`, `--force`, `--from-db PATH` to adopt an existing store, `--auto-consolidate N`, `--auto-prune N`) |
 | `info` | version, `ENGRAM_TAG`, brains, tiers |
 | `stats` | per-brain episode counts (`--brain NAME`) |
 | `config` | get/set config keys (`config KEY [VALUE]`, `--brain NAME`, `--value`, `--show-secrets`) |
@@ -124,12 +124,14 @@ positronic stats                       # per-brain episode counts
 | `llm-setup` | tier guide (`--tier 1\|2\|3`) |
 | `update` | deferred engine update (`--check`, `--status`, `--tail N`, `--pin TAG`) |
 | `delete` | delete a brain (`--brain NAME`, `--force`) |
-| `query` | query a brain: text, `--sql`, `--cue`, `--anchors`, `--objects`, `--sightings` (`--k N`) |
-| `prune` | prune a brain's memory (`--brain NAME`) |
+| `query` | query a brain: text, `--sql` (read-only), `--cue`, `--anchors`, `--objects`, `--sightings`, `--object kind:canonical` (substring-resolving identity dossier), `--range` (wall window, oldest first), `--describe` (store map for LLM-written SQL) (`--k N`, `--since/--until`, `--stream`) |
+| `prune` | prune a brain's memory (`--brain NAME`, `--axis tau\|wall`, `--wall-now F`) |
 | `consolidate` | consolidate episodes (`--arousal F`, `--brain NAME`) |
-| `ingest` | ingest an event into a brain (`--arousal F`, `--brain NAME`; message metadata `sender`/`date`/`message_id` persisted, hard-deduped by message-id) |
-| `recall` | fused recall across federated brains (`--k N`) |
+| `ingest` | ingest an event into a brain (`--arousal F`, `--brain NAME`, `--role`, `--dedup`; message metadata `sender`/`date`/`message_id` persisted, hard-deduped by message-id) |
+| `ingest-log` | a log file into a brain under a validated schema (`--schema PATH --file PATH`, `--since/--until`, `--limit N`, `--dry-run`, `--skip-validate`) |
+| `recall` | fused recall across federated brains (`--k N`, `--consolidation`, `--context N`) |
 | `ask` | answer a question from brain memory |
+| `tag` | tag an episode (`--episode-id ID | --message-id ID`, TAG one of: clean, spam, phishing, scam) |
 | `wake` | trigger a consolidation marker + prune sweep |
 | `doctor` | `{ lexical, bge, llama, engram }` tier check |
 
