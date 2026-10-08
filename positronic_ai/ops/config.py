@@ -70,7 +70,7 @@ def run(dir, *, key=None, value=None, brain=None, confirm=False,
     if key == "profile" and value == "archival" and not confirm:
         before = json.loads(json.dumps(load_config(dir)))
         _mask(before, bool(show_secrets))
-        return {"warning": "Retention archival never forgets — E7 55/55/35/7 vs balanced. Re-invoke with confirm:true",
+        return {"warning": "Retention archival never forgets — E7 55/55/35/11 vs balanced. Re-invoke with confirm:true",
                 "before": before}
     out = set_key(dir, key, value, brain=brain)
     _mask(out["before"], bool(show_secrets))
