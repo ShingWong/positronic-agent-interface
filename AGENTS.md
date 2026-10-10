@@ -25,7 +25,7 @@ along with this program. If not, see <https://gnu.org>.
 # AGENTS.md — positronic-agent-interface
 
 Python package `positronic_ai` (PAI): polytemporal memory agent interface over
-`memeng` (positronic-engram, pinned `ENGRAM_TAG=v0.2.0`). Exposes every
+`memeng` (positronic-engram, pinned `ENGRAM_TAG=v0.3.1`). Exposes every
 operation as a code API (`positronic_ai.*`) and a CLI verb (`positronic` /
 `python -m positronic_ai`).
 

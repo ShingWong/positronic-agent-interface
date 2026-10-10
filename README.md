@@ -96,7 +96,7 @@ pip install "git+https://github.com/ShingWong/positronic-agent-interface.git"
 ```
 
 This installs the `positronic` console script plus the `positronic_ai` package (`memeng` is pulled
-in at `v0.3.0`, `positronic-logschema` at the pinned commit in `pyproject.toml`).
+in at `v0.3.1`, `positronic-logschema` at the pinned commit in `pyproject.toml`).
 
 ---
 
