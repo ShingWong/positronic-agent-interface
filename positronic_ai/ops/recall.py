@@ -33,7 +33,7 @@ import logging
 from pathlib import Path
 
 from ..config import load_config
-from ..engine import open_engine
+from ..engine import embed_profile, open_engine
 from ..objects import object_digest, resolve_object
 
 log = logging.getLogger(__name__)
@@ -81,7 +81,29 @@ def run(dir, text, *, k=8, brains=None, consolidation=None,
             continue
         try:
             _s, e = open_engine(dir, name)
-            hits = e.activate({"text": text}, k=k,
+            cue = {"text": text}
+            prof = embed_profile(_s)
+            if prof and prof.get("model"):
+                # Query side of the task-prompt pair. The profile is READ
+                # from the brain's own meta, never configured here, so a
+                # query is always embedded the way its documents were -- the
+                # alternative is a silently mismatched vector space that
+                # looks like a weak model. Missing an embedding is safe:
+                # activate() falls back to the lexical channel below.
+                from ..embed import EMBED_MODELS, embed_one
+                spec = EMBED_MODELS.get(prof["model"])
+                if spec:
+                    embed_cfg = cfg.get("embed") or {}
+                    url = embed_cfg.get(spec["url_key"]) or embed_cfg.get(
+                        "local_url", "http://127.0.0.1:8090")
+                    try:
+                        cue["embedding"] = embed_one(
+                            text, url, role="query", model=prof["model"])[0]
+                    except Exception:  # noqa: BLE001 — embedder down: lexical still works
+                        log.warning(
+                            "recall: brain %s query embed failed — lexical only",
+                            name)
+            hits = e.activate(cue, k=k,
                               consolidation=consolidation,
                               context_window=context_window)
         except Exception:  # noqa: BLE001  (federated skip — one bad brain must not fail recall)

@@ -101,9 +101,66 @@ def embed_texts(texts: list[str], url: str) -> list[list[float]]:
     return [_embed_halving(t, url) for t in texts]
 
 
-def embed_one(text: str, url: str) -> tuple[list[float], int]:
+# -- embedder profiles -------------------------------------------------------
+#
+# Which model a brain embeds with is a per-BRAIN decision, not a global one.
+# Both the task-prompt style and the native vector dimension differ between
+# models, and which one wins is data-sensitive: structured log lines, mail
+# prose and CVE summaries are not the same distribution. A single global
+# default would be convenient and wrong, so the default here only preserves
+# today's behaviour and every brain may override it.
+#
+# Note the prompts are DERIVED from the model, never configured separately.
+# EG2 is trained on a SearchQuery/Document pair: a document embedded without
+# `Document:` and a query embedded without `SearchQuery:` land in mismatched
+# spaces, and retrieval silently degrades -- the failure looks like a weak
+# model rather than a missing prefix. Two independently-set keys would be two
+# chances to get that wrong.
+
+EMBED_MODELS: dict[str, dict] = {
+    # name -> url config key, task-prompt style, native dimension
+    "bge-m3": {"url_key": "local_url", "prompts": "none", "dim": 1024},
+    "eg2": {"url_key": "eg2_url", "prompts": "eg2", "dim": 768},
+}
+
+DEFAULT_EMBED_MODEL = "bge-m3"
+
+_PROMPT_STYLES: dict[str, dict[str, str]] = {
+    "eg2": {"document": "Document: ", "query": "SearchQuery: "},
+}
+
+
+def known_models() -> list[str]:
+    return sorted(EMBED_MODELS)
+
+
+def model_dim(model: str) -> int | None:
+    """Native dimension for a model, or None if unconfigured."""
+    spec = EMBED_MODELS.get(model)
+    return int(spec["dim"]) if spec else None
+
+
+def prompt_prefix(model: str, role: str) -> str:
+    """Task prompt for (model, role); "" when the model takes none."""
+    style = EMBED_MODELS.get(model, {}).get("prompts", "none")
+    return _PROMPT_STYLES.get(style, {}).get(role, "")
+
+
+def embed_one(text: str, url: str, *, role: str = "document",
+              model: str = DEFAULT_EMBED_MODEL) -> tuple[list[float], int]:
+    """Embed one text as `role` under `model`'s task-prompt style.
+
+    `role` is part of the vector's provenance, not cosmetic: it selects the
+    task prompt, and a vector embedded with the wrong role is silently
+    unqueryable by vectors embedded with the right one.
+    """
     from .chunk import chunk_markdown
+    prefix = prompt_prefix(model, role)
     chunks = chunk_markdown(text, max_chars=CHUNK_TOKENS * CHARS_PER_TOKEN)
+    if prefix:
+        # Prefix per chunk: each chunk is embedded as its own document, and
+        # an unprefixed chunk would drift out of the pair-trained space.
+        chunks = [prefix + c for c in chunks]
     vecs = embed_texts(chunks, url)
     dim = len(vecs[0])
     mean = [sum(v[i] for v in vecs) / len(vecs) for i in range(dim)]

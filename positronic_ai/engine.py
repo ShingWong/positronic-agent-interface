@@ -28,6 +28,8 @@ import pathlib
 from memeng.engine import MemoryEngine
 from memeng.store import SQLiteStore
 
+import json
+
 from .config import load_config
 
 
@@ -41,10 +43,98 @@ def open_engine(project_dir, brain: str) -> tuple[SQLiteStore, MemoryEngine]:
     engine_cfg = brain_engine_config(bcfg)
     e = MemoryEngine(s, engine_cfg or None)
     if bcfg.get("embed") == "local":
-        from .embed import embed_one
-        local_url = (cfg.get("embed") or {}).get("local_url", "http://127.0.0.1:8090")
-        e.bind_embedder(lambda text: embed_one(text, local_url)[0])
+        e.bind_embedder(embedder_for(brain, bcfg, cfg, s))
     return s, e
+
+
+# -- embedding profile -------------------------------------------------------
+#
+# A brain's embedding model is stamped into its OWN meta table, and the
+# query path reads the stamp rather than the config. That makes a mismatch
+# structurally impossible instead of a config mistake: editing config.json,
+# or swapping a model under an existing brain, cannot silently leave the
+# brain querying a vector space it was never embedded into.
+
+EMBED_PROFILE_KEY = "embed_profile"
+
+
+def _existing_embed_dim(store) -> int | None:
+    row = store.conn.execute(
+        "SELECT body_embed FROM episode WHERE body_embed IS NOT NULL LIMIT 1"
+    ).fetchone()
+    return len(row[0]) // 4 if row else None
+
+
+def _stamp_or_verify(store, brain: str, profile: dict) -> None:
+    """Record the profile on first embed; refuse a silent change thereafter.
+
+    With no vectors yet there is nothing to corrupt, so the profile may be
+    freely set -- that is the setup-before-ingest case. Once vectors exist,
+    changing model under them raises rather than silently corrupting
+    retrieval.
+    """
+    want = json.dumps(profile, sort_keys=True)
+    row = store.conn.execute(
+        "SELECT v FROM meta WHERE k=?", (EMBED_PROFILE_KEY,)).fetchone()
+    if row is None:
+        store.conn.execute(
+            "INSERT INTO meta(k, v) VALUES(?, ?)", (EMBED_PROFILE_KEY, want))
+        store.conn.commit()
+        return
+    if row[0] == want:
+        return
+    if _existing_embed_dim(store) is None:
+        store.conn.execute(
+            "UPDATE meta SET v=? WHERE k=?", (want, EMBED_PROFILE_KEY))
+        store.conn.commit()
+        return
+    raise ValueError(
+        f"brain {brain!r} was embedded as {row[0]} but is now configured "
+        f"as {want}. Changing model under existing vectors silently breaks "
+        f"retrieval; use a separate brain, or re-embed from scratch with "
+        f"the old vectors cleared first.")
+
+
+def embedder_for(brain: str, bcfg: dict, cfg: dict, store):
+    """Build the document-side embedder for one brain.
+
+    `embed_model` is the single knob; the task-prompt style is derived from
+    it in embed.py so the two cannot drift apart.
+    """
+    from .embed import (DEFAULT_EMBED_MODEL, EMBED_MODELS, embed_one,
+                        known_models, model_dim)
+    model = bcfg.get("embed_model") or DEFAULT_EMBED_MODEL
+    spec = EMBED_MODELS.get(model)
+    if spec is None:
+        raise ValueError(f"unknown embed_model {model!r} for brain {brain!r}; "
+                         f"known: {known_models()}")
+    embed_cfg = cfg.get("embed") or {}
+    url = embed_cfg.get(spec["url_key"]) or embed_cfg.get(
+        "local_url", "http://127.0.0.1:8090")
+    dim = model_dim(model)
+    have = _existing_embed_dim(store)
+    if have is not None and dim is not None and have != dim:
+        # FlatVectorIndex also refuses a dim mismatch at add() time, but that
+        # fires only once a second dimension appears -- i.e. after some rows
+        # are already wrong. Catching it here fails before any write.
+        raise ValueError(
+            f"brain {brain!r} already holds {have}-dim vectors but "
+            f"embed_model {model!r} produces {dim}-dim.")
+    _stamp_or_verify(store, brain,
+                     {"model": model, "prompts": spec["prompts"], "dim": dim})
+    return lambda text: embed_one(text, url, role="document", model=model)[0]
+
+
+def embed_profile(store) -> dict | None:
+    """The profile this brain's vectors were written with, or None."""
+    row = store.conn.execute(
+        "SELECT v FROM meta WHERE k=?", (EMBED_PROFILE_KEY,)).fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row[0])
+    except (TypeError, ValueError):
+        return None
 
 
 def brain_engine_config(brain_cfg: dict) -> dict:
