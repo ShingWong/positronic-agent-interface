@@ -165,3 +165,80 @@ def embed_one(text: str, url: str, *, role: str = "document",
     dim = len(vecs[0])
     mean = [sum(v[i] for v in vecs) / len(vecs) for i in range(dim)]
     return mean, len(vecs)
+
+
+# -- multimodal --------------------------------------------------------------
+#
+# llama-server's /v1/embeddings accepts an OAI content array when --mmproj is
+# loaded, so an image can be embedded into the SAME vector as its text -- no
+# OCR bridge, no "extract text and hope it describes the picture". The text
+# half still carries the task prompt; the image half does not take one.
+
+_MM_MIMES = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp",
+    ".tif": "image/tiff", ".tiff": "image/tiff",
+}
+
+
+def guess_mime(name: str) -> str:
+    """Best-effort mime for a filename; png when unknown."""
+    ext = "." + str(name).rsplit(".", 1)[-1].lower()
+    return _MM_MIMES.get(ext, "image/png")
+
+
+def text_part(text: str) -> dict:
+    return {"type": "text", "text": text}
+
+
+def image_part(data: bytes, mime: str = "image/png") -> dict:
+    """Inline image as an OAI data URL."""
+    import base64
+    return {"type": "image_url",
+            "image_url": {"url": f"data:{mime};base64,"
+                                 f"{base64.b64encode(bytes(data)).decode()}"}}
+
+
+def _post_multimodal(parts: list[dict], url: str,
+                     timeout: int = 300) -> list[float]:
+    """Embed one content-array item. OAI shape, OAI response."""
+    import urllib.error
+    import urllib.request
+    body = json.dumps({"input": [{"content": parts}]}).encode()
+    last_err: Exception | None = None
+    for u in _as_url_list(url):
+        req = urllib.request.Request(u.rstrip("/") + "/v1/embeddings",
+                                     data=body,
+                                     headers={"Content-Type":
+                                              "application/json"})
+        try:
+            d = json.loads(urllib.request.urlopen(req, timeout=timeout).read())
+            return list(d["data"][0]["embedding"])
+        except urllib.error.HTTPError as e:
+            msg = e.read()[:300].decode("utf-8", "replace")
+            last_err = RuntimeError(f"multimodal embedding HTTP {e.code}: {msg}")
+            continue
+        except Exception as e:  # noqa: BLE001 (try next URL)
+            last_err = e
+            continue
+    raise RuntimeError(f"multimodal embedding failed on all urls: "
+                       f"{last_err}") from None
+
+
+def embed_with_image(text: str, url: str, *, image: bytes | None = None,
+                     mime: str = "image/png", role: str = "document",
+                     model: str = DEFAULT_EMBED_MODEL) -> list[float]:
+    """One vector for text plus an optional image.
+
+    With no image this is the text path with the same task prompt, so a
+    caller can use it unconditionally without the two sides diverging on
+    prompt handling.
+
+    Raises with the server's own message when --mmproj is absent, which is
+    the expected failure until the EG2 server is started with the projector.
+    """
+    prefix = prompt_prefix(model, role)
+    parts = [text_part(prefix + text if prefix else text)]
+    if image:
+        parts.append(image_part(image, mime))
+    return _post_multimodal(parts, url)
