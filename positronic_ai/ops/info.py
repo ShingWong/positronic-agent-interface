@@ -39,7 +39,7 @@ def run(dir) -> dict:
     except Exception:  # noqa: BLE001  (config absent → defaults)
         log.warning("info: config unreadable — defaults used")
         cfg = {"brains": {}, "engram_tag": ENGRAM_TAG}
-    doc = doctor.run()
+    doc = doctor.run(dir)
     return {
         "version": __version__,
         "engram_tag": cfg.get("engram_tag", ENGRAM_TAG),

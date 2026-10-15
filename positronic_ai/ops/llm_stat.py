@@ -29,9 +29,9 @@ pooling is "cls" when the bge tier is ok, else "unknown".
 from . import doctor
 
 
-def run() -> dict:
-    """Return {bge, llama, lexical, engram, pooling}."""
-    t = doctor.run()["tiers"]
+def run(dir=None) -> dict:
+    """Return {bge, llama, lexical, engram, pooling} for the project dir."""
+    t = doctor.run(dir)["tiers"]
     return {
         "bge": t["bge"],
         "llama": t["llama"],

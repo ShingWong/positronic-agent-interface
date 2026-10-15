@@ -166,7 +166,7 @@ def _run(verb, dir, args, flags) -> dict:
         return OPS["brain-test"](dir, brain=_brain(flags),
                                  k=_int(flags, "k", 3))
     if verb == "llm-stat":
-        return OPS["llm-stat"]()
+        return OPS["llm-stat"](dir)
     if verb == "llm-setup":
         tier = flags.get("tier") or (args[0] if args else "3")
         return OPS["llm-setup"](tier)
@@ -238,7 +238,7 @@ def _run(verb, dir, args, flags) -> dict:
                           message_id=flags.get("message-id"),
                           tag=(args[0] if args else flags.get("tag")))
     if verb == "doctor":
-        return OPS["doctor"]()
+        return OPS["doctor"](dir)
     raise ValueError(f"unhandled verb {verb}")
 
 

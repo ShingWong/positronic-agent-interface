@@ -27,6 +27,13 @@
 Each tier is probed the same way the TS command does: engram via PYTHONPATH
 import of memeng.store, bge via a 2s urllib health probe, llama via binary
 existence, lexical always ok (FTS5).
+
+The bge tier probes the server the embedder actually uses: the project's
+`embed.local_url` from `.positronic/config.json` (comma/space-separated lists
+are probed in order, like the embedder's own URL fallback). It only falls back
+to the localhost default for a project with no config, so a brain pointed at a
+LAN embedding server no longer reports "down" while encoding fine.
+`$POSITRONIC_BGE_URL` overrides the probe for tests and ad-hoc checks.
 """
 import json
 import logging
@@ -35,10 +42,15 @@ import shutil
 import urllib.request
 from pathlib import Path
 
+from ..config import load_config
+from ..embed import _as_url_list
+
 log = logging.getLogger(__name__)
 
-BGE_URL = "http://127.0.0.1:8090/health"
+DEFAULT_LOCAL_URL = "http://127.0.0.1:8090"
+BGE_URL = DEFAULT_LOCAL_URL + "/health"
 BGE_TIMEOUT = 2
+BGE_ENV = "POSITRONIC_BGE_URL"
 # llama-server is an optional local model server, so it is never on PATH by
 # default and cannot be assumed to exist. The old LLAMA_FALLBACK constant
 # hardcoded one developer's ~/.tmp build tree: a username in shipped public
@@ -46,12 +58,16 @@ BGE_TIMEOUT = 2
 # PATH plus whatever POSITRONIC_LLAMA_SERVER names instead.
 LLAMA_ENV = "POSITRONIC_LLAMA_SERVER"
 
-def run() -> dict:
-    """Probe each tier; returns {tiers: {engram, bge, llama, lexical}}."""
+def run(dir=None) -> dict:
+    """Probe each tier; returns {tiers: {engram, bge, llama, lexical}}.
+
+    `dir` is the project directory. Pass it (the CLI already has the cwd) so
+    the bge probe reads that project's `embed.local_url`.
+    """
     return {
         "tiers": {
             "engram": _engram(),
-            "bge": _bge(),
+            "bge": _bge(dir),
             "llama": _llama(),
             "lexical": "ok",  # FTS5 always works
         }
@@ -72,14 +88,43 @@ def _engram() -> str:
         log.warning("doctor: memeng import failed")
         return "missing"
 
-def _bge() -> str:
+def _bge_base_urls(dir=None) -> list[str]:
+    """Base URLs the embedder would use for this project.
+
+    Order: $POSITRONIC_BGE_URL (tests / ad-hoc override), else the project's
+    `embed.local_url`, else the localhost default for a project with no config.
+    """
+    env = os.environ.get(BGE_ENV)
+    if env and env.strip().lower() != "off":
+        urls = _as_url_list(env)
+        if urls:
+            return urls
+    if dir is None:
+        return [DEFAULT_LOCAL_URL]
     try:
-        with urllib.request.urlopen(BGE_URL, timeout=BGE_TIMEOUT) as resp:
-            body = json.loads(resp.read().decode("utf-8", "replace"))
-        return "ok" if body.get("status") == "ok" else "down"
-    except Exception:  # noqa: BLE001  (health probe — any probe failure = down)
-        log.warning("doctor: bge health probe failed")
-        return "down"
+        cfg = load_config(dir)
+    except Exception:  # noqa: BLE001  (config absent/unreadable → default probe)
+        log.warning("doctor: config unreadable — probing %s", DEFAULT_LOCAL_URL)
+        return [DEFAULT_LOCAL_URL]
+    raw = (cfg.get("embed") or {}).get("local_url") or DEFAULT_LOCAL_URL
+    return _as_url_list(raw) or [DEFAULT_LOCAL_URL]
+
+def _health_url(base: str) -> str:
+    url = str(base).strip().rstrip("/")
+    return url if url.endswith("/health") else url + "/health"
+
+def _bge(dir=None) -> str:
+    """Probe every configured embedding URL; ok when any answers /health."""
+    for base in _bge_base_urls(dir):
+        url = _health_url(base)
+        try:
+            with urllib.request.urlopen(url, timeout=BGE_TIMEOUT) as resp:
+                body = json.loads(resp.read().decode("utf-8", "replace"))
+            if body.get("status") == "ok":
+                return "ok"
+        except Exception:  # noqa: BLE001  (health probe — any probe failure = down)
+            log.warning("doctor: bge health probe failed (%s)", url)
+    return "down"
 
 def _llama() -> str:
     exe = os.environ.get(LLAMA_ENV) or "llama-server"
