@@ -40,13 +40,24 @@ Smoke probe: encode a probe event, time encode + recall.
 
 **Returns**: `{ok, encode_ms, recall_ms, hits, fallback, rrf_score}`.
 
-## `doctor() -> dict`
+## `doctor(dir=None) -> dict`
 
-Probe engram/bge/llama/lexical tiers; each is best-effort.
+Probe engram/bge/llama/lexical tiers; each is best-effort. `dir` is the
+project dir (the CLI always has the cwd).
+
+The bge probe targets the server this project's embedder actually uses:
+`embed.local_url` from `.positronic/config.json` (comma/space-separated
+lists are probed in order, first `status: ok` wins — the same failover the
+embedder uses). `$POSITRONIC_BGE_URL` overrides the probe for tests and
+ad-hoc checks, `off` skips it, and only a project with no config falls
+back to `http://127.0.0.1:8090`. Called without `dir`, the probe is
+localhost-only.
 
 **Returns**: `{tiers: {engram, bge, llama, lexical}}`.
 
-## `llm_stat() -> dict`
+## `llm_stat(dir=None) -> dict`
+
+The project's `doctor(dir)` tiers, reshaped — same config-aware bge probe.
 
 **Returns**: `{bge, llama, lexical, engram, pooling}` (`pooling` = `"cls"`
 when bge is ok, else `"unknown"`).

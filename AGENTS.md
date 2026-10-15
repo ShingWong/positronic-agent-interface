@@ -67,6 +67,18 @@ ruff check positronic_ai/ tests/
 Every `.py` file carries the AGPL dual-license header; `pyproject.toml` carries
 `license = "AGPL-3.0-or-later OR LicenseRef-Commercial"`. No MCP anywhere.
 
+## Engine hygiene
+
+Writer ops — `ingest`, `prune`, `brain_test`, `tag`, `ingest-log` — must
+release the store they open: `close_engine(store)` from
+`positronic_ai.engine` commits, then closes. An unclosed connection keeps
+SQLite's write transaction, so the *next* open in the same process dies
+inside `SQLiteStore.__init__` (`executescript` DDL) with `database is
+locked`. The CLI and the opencode plugin hide this by spawning one
+interpreter per verb; a process that runs two ops (pytest, the HTTP
+server, a long-lived worker) is where it surfaces. Read-only ops need not
+close — SELECTs autocommit and hold no write transaction.
+
 ## Note
 
 The opencode plugin (`positronic-opencode-plugin`) and claude-code integrations

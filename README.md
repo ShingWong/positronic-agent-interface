@@ -120,7 +120,7 @@ positronic stats                       # per-brain episode counts
 | `stats` | per-brain episode counts (`--brain NAME`) |
 | `config` | get/set config keys (`config KEY [VALUE]`, `--brain NAME`, `--value`, `--show-secrets`) |
 | `brain-test` | smoke probe `new_event -> activate` on a brain (`--brain NAME`, `--k N`) |
-| `llm-stat` | bge/llama tier health |
+| `llm-stat` | bge/llama tier health (bge probed at the project's `embed.local_url`) |
 | `llm-setup` | tier guide (`--tier 1\|2\|3`) |
 | `update` | deferred engine update (`--check`, `--status`, `--tail N`, `--pin TAG`) |
 | `delete` | delete a brain (`--brain NAME`, `--force`) |
@@ -133,7 +133,7 @@ positronic stats                       # per-brain episode counts
 | `ask` | answer a question from brain memory |
 | `tag` | tag an episode (`--episode-id ID | --message-id ID`, TAG one of: clean, spam, phishing, scam) |
 | `wake` | trigger a consolidation marker + prune sweep |
-| `doctor` | `{ lexical, bge, llama, engram }` tier check |
+| `doctor` | `{ lexical, bge, llama, engram }` tier check — bge at `embed.local_url` |
 
 Every verb works as `positronic <verb>` or `python -m positronic_ai <verb>`, and returns
 JSON-serializable dicts. Full signature + return contract: `api-spec.md`; design rationale:

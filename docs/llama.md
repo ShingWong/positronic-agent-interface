@@ -31,6 +31,11 @@ wins; comma or space separated):
 positronic config local_url "http://bge1:8090, http://bge2:8090"
 ```
 
+`positronic doctor` / `positronic llm-stat` probe exactly those URLs, in the
+same order, so a LAN embedding server reports `bge: ok` instead of `down`.
+`$POSITRONIC_BGE_URL` overrides the probe (`off` skips it), and only a
+project with no config falls back to `http://127.0.0.1:8090`.
+
 `remote` is API-key-style hosted embedding only (`embed.remote_url` +
 `embed.remote_key` in `.positronic/config.json`; `config` masks the key without
 `--show-secrets`). As of this release no embedder binds for `remote` brains —
@@ -116,6 +121,10 @@ journalctl -u bge-embed -n 50 --no-pager
 positronic doctor         # human-readable
 positronic doctor --json  # { tiers: { lexical, bge, llama, engram } }
 ```
+
+The bge probe reads the current project's `embed.local_url` (order and
+overrides above), so `doctor` answers for *this* project's embedding
+server — pass the project dir (`doctor(dir)`) when it is not the cwd.
 
 <!-- =====================================================================
 Project Positronic — Polytemporal Cognitive Engram Memory Substrate
