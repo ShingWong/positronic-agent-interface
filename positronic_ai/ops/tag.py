@@ -26,7 +26,7 @@
 import json
 
 from ..config import load_config
-from ..engine import open_engine
+from ..engine import close_engine, open_engine
 
 ALLOWED = ("clean", "spam", "phishing", "scam")
 
@@ -53,6 +53,7 @@ def run(dir, *, brain=None, episode_id=None, message_id=None,
             "AND json_extract(features_json,'$.message_id') = ? LIMIT 1",
             (mid,)).fetchone()
     if row is None:
+        close_engine(s)
         return {"ok": False, "error": "episode not found"}
     feat = json.loads(row["features_json"])
     feat["threat_tag"] = tag
@@ -65,4 +66,5 @@ def run(dir, *, brain=None, episode_id=None, message_id=None,
     if (subj + " " + body).strip():
         s.fts_upsert(row["id"], f"{subj} threat:{tag} {body}".strip())
     s.conn.commit()
+    close_engine(s)
     return {"ok": True, "brain": name, "episode_id": row["id"], "tag": tag}

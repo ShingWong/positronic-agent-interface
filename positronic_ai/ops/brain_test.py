@@ -29,25 +29,27 @@ from datetime import datetime, timezone
 from memeng.models import Event
 
 from ..config import load_config
-from ..engine import open_engine
+from ..engine import close_engine, open_engine
 
 
 def run(dir, *, brain=None, k=3) -> dict:
     """Write a probe event, time encode + recall, return {ok, encode_ms, recall_ms, hits, fallback, rrf_score}."""
     k = k or 3
     brain = brain or next(iter(load_config(dir).get("brains", {})), None) or "kairos"
-    _s, e = open_engine(dir, brain)
+    s, e = open_engine(dir, brain)
+    try:
+        t0 = time.perf_counter()
+        e.new_event(Event(stream=f"positronic:{brain}", kind="message",
+                          persons=["p_kairos"], wall=datetime.now(timezone.utc),
+                          features={"subject_norm": "positronic:probe",
+                                    "body_text": "probe positronic", "arousal": 0.8}))
+        encode_ms = (time.perf_counter() - t0) * 1000
 
-    t0 = time.perf_counter()
-    e.new_event(Event(stream=f"positronic:{brain}", kind="message",
-                      persons=["p_kairos"], wall=datetime.now(timezone.utc),
-                      features={"subject_norm": "positronic:probe",
-                                "body_text": "probe positronic", "arousal": 0.8}))
-    encode_ms = (time.perf_counter() - t0) * 1000
-
-    t1 = time.perf_counter()
-    results = e.activate({"text": "probe positronic"}, k=k)
-    recall_ms = (time.perf_counter() - t1) * 1000
+        t1 = time.perf_counter()
+        results = e.activate({"text": "probe positronic"}, k=k)
+        recall_ms = (time.perf_counter() - t1) * 1000
+    finally:
+        close_engine(s)
 
     hits = 1 if any(r.get("episode_id") for r in results) else 0
     fallback = bool(any(r.get("fallback") for r in results))

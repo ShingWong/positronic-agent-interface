@@ -36,7 +36,7 @@ import logging
 from memeng.ingest import ingest_records
 
 from ..config import load_config
-from ..engine import open_engine
+from ..engine import close_engine, open_engine
 
 log = logging.getLogger(__name__)
 
@@ -101,16 +101,19 @@ def run(dir, *, schema, file, brain=None, domain=None, stream=None,
                           f"({coverage['records_unclassified']} unclassified, "
                           f"{coverage['classes_claimed']} classes claim)")} 
 
-    _s, e = open_engine(dir, name)
-    dom = domain or name
-    e.register_domain(dom, retention_profile="balanced")
-    stream_name = stream or f"{dom}:maillog"
+    s, e = open_engine(dir, name)
     try:
-        e.attach_stream(stream_name, dom)
-    except Exception:  # noqa: BLE001 -- re-ingest into a live stream
-        log.debug("ingest-log: stream %s already attached", stream_name)
-    ing = ingest_records(e, schema_d, batch, stream=stream_name,
-                         classify=classify)
+        dom = domain or name
+        e.register_domain(dom, retention_profile="balanced")
+        stream_name = stream or f"{dom}:maillog"
+        try:
+            e.attach_stream(stream_name, dom)
+        except Exception:  # noqa: BLE001 -- re-ingest into a live stream
+            log.debug("ingest-log: stream %s already attached", stream_name)
+        ing = ingest_records(e, schema_d, batch, stream=stream_name,
+                             classify=classify)
+    finally:
+        close_engine(s)
     out = {"ok": True, "brain": name, "domain": dom, "stream": stream_name,
            "records_in_window": len(batch), "coverage": coverage,
            "validated": bool(rep.ok), "skipped_validation": skip_validate,

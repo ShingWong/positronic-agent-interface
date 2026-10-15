@@ -47,6 +47,29 @@ def open_engine(project_dir, brain: str) -> tuple[SQLiteStore, MemoryEngine]:
     return s, e
 
 
+def close_engine(store) -> None:
+    """Commit and close a store opened by open_engine.
+
+    SQLite holds a write transaction until commit, and an unclosed connection
+    holds it for good: the next open in the same process then dies inside
+    SQLiteStore.__init__ (executescript DDL) with `sqlite3.OperationalError:
+    database is locked`. Auto-prune hit exactly that — ingest held the brain,
+    prune opened it a second time, and the query that followed could not
+    create its tables (tests/test_auto.py::test_auto_prune_trigger_and_reset,
+    red on CI and locally).
+
+    One verb per process hides the leak — the CLI and the opencode plugin both
+    spawn a fresh interpreter per call — so anything that runs two ops in one
+    process (the test suite, the HTTP server, a long-lived embedding worker)
+    is where it surfaces. Read-only ops are exempt: SELECTs autocommit and
+    leave no write transaction behind.
+    """
+    try:
+        store.conn.commit()
+    finally:
+        store.conn.close()
+
+
 # -- embedding profile -------------------------------------------------------
 #
 # A brain's embedding model is stamped into its OWN meta table, and the

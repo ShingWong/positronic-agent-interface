@@ -26,7 +26,7 @@
 from dataclasses import asdict
 
 from ..config import load_config
-from ..engine import open_engine
+from ..engine import close_engine, open_engine
 
 
 def run(dir, *, brain=None, tau_now=None, decay_axis="tau",
@@ -50,6 +50,9 @@ def run(dir, *, brain=None, tau_now=None, decay_axis="tau",
     name = brain or next(iter(cfg.get("brains", {})), None)
     if not name:
         raise ValueError("no brains configured — run positronic init")
-    _s, e = open_engine(dir, name)
-    rep = e.prune(tau_now=tau_now, decay_axis=decay_axis, wall_now=wall_now)
+    s, e = open_engine(dir, name)
+    try:
+        rep = e.prune(tau_now=tau_now, decay_axis=decay_axis, wall_now=wall_now)
+    finally:
+        close_engine(s)
     return asdict(rep)

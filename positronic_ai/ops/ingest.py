@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from memeng.models import Event
 
 from ..config import load_config, save_config
-from ..engine import open_engine
+from ..engine import close_engine, open_engine
 
 
 def normalize_message_id(raw) -> str:
@@ -69,7 +69,10 @@ def find_duplicate(dir, message_id, *, brain=None, kind="message") -> dict | Non
     if not name:
         return None
     s, _ = open_engine(dir, name)
-    return _dup_result(s.conn, mid)
+    try:
+        return _dup_result(s.conn, mid)
+    finally:
+        close_engine(s)
 
 
 def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
@@ -87,6 +90,7 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
     if kind == "message" and mid:
         dup = _dup_result(s.conn, mid)
         if dup is not None:
+            close_engine(s)
             return dup
 
     dedup_eff = cfg.get("dedup") if dedup is None else dedup
@@ -98,6 +102,7 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
         if row is not None:
             last = json.loads(row["features_json"]).get("body_text")
             if last == text:
+                close_engine(s)
                 return {"duplicate": True, "skipped": True, "tau": None}
 
     subj = subject or text[:80]
@@ -161,6 +166,11 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
     out["embedded"] = bool(emb)
     if not emb:
         out["embed_reason"] = "no embedder bound (init --embed local + local_url)"
+    # Release our write connection BEFORE the auto hooks below: they open the
+    # same brain again (consolidate -> ingest, prune -> engine), and two open
+    # writers on one file is how this verb used to hand "database is locked"
+    # to whatever ran next in the same process.
+    close_engine(s)
     if kind == "message":
         _advance_counters(dir, name)
     if verdict["tag"] != "clean" or verdict["reasons"]:
