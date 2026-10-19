@@ -45,8 +45,8 @@ def normalize_message_id(raw) -> str:
 def _dup_result(conn, mid: str) -> dict | None:
     """The duplicate verdict for a normalised message id, or None."""
     row = conn.execute(
-        "SELECT id FROM episode WHERE kind='message' "
-        "AND json_extract(features_json,'$.message_id') = ? "
+        "SELECT id FROM episode "
+        "WHERE json_extract(features_json,'$.message_id') = ? "
         "LIMIT 1", (mid,)).fetchone()
     if row is None:
         return None
@@ -87,7 +87,7 @@ def run(dir, text, *, brain=None, kind="message", arousal=0.5, subject=None,
     s, e = open_engine(dir, name)
 
     mid = normalize_message_id(message_id)
-    if kind == "message" and mid:
+    if mid:
         dup = _dup_result(s.conn, mid)
         if dup is not None:
             close_engine(s)
