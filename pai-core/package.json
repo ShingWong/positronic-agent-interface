@@ -16,7 +16,11 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./turso": {
+      "types": "./dist/engine-turso.d.ts",
+      "default": "./dist/engine-turso.js"
+    }
   },
   "scripts": {
     "build": "tsc",
@@ -25,10 +29,19 @@
     "check": "tsc --noEmit"
   },
   "devDependencies": {
+    "@tursodatabase/database": "^0.8.3",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },
   "dependencies": {
     "@sqlite.org/sqlite-wasm": "^3.53.4-build1"
+  },
+  "peerDependencies": {
+    "@tursodatabase/database": "^0.8.3"
+  },
+  "peerDependenciesMeta": {
+    "@tursodatabase/database": {
+      "optional": true
+    }
   }
 }

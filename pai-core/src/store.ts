@@ -22,10 +22,15 @@
 // along with this program. If not, see <https://gnu.org>.
 // =====================================================================
 
-// PAI core — local brain store on sqlite-wasm.
-// OPFS persistence when available (worker + sync handle), in-memory
-// fallback otherwise. FTS5 lexical recall. One writer: callers serialize
-// writes through a single worker (OPFS exclusive-lock constraint).
+// PAI core — local brain store.
+//
+// The storage engine is a port (see db.ts). The default is sqlite-wasm with
+// FTS5; a host may supply another — engine-turso.ts is the worked example —
+// which is what pai-core's "hosts provide storage" contract has always meant.
+//
+// OPFS persistence when available (worker + sync handle), in-memory fallback
+// otherwise. One writer: callers serialize writes through a single worker
+// (OPFS exclusive-lock constraint).
 //
 // Schema mirrors the server brain at query time: episodes carry
 // subject/snippet/body/threat/message_id/sender/tau/wall as columns,
@@ -35,6 +40,8 @@ import type { ThreatTag } from "./threat.js";
 import { normalizeMessageId } from "./messageId.js";
 import { scoreThreat } from "./threat.js";
 import { detectTable } from "./tables.js";
+import type { BrainDb, BrainEngine } from "./db.js";
+import { sqliteWasmEngine } from "./engine-sqlite.js";
 
 export interface LocalEpisode {
   episodeId: string;
@@ -62,39 +69,6 @@ export interface RecallHit {
   rrf_score: number;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SqliteDb = any;
-
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS episode (
-  id TEXT PRIMARY KEY,
-  subject TEXT NOT NULL DEFAULT '',
-  body TEXT NOT NULL DEFAULT '',
-  sender TEXT NOT NULL DEFAULT '',
-  message_id TEXT NOT NULL DEFAULT '',
-  threat_tag TEXT NOT NULL DEFAULT 'clean',
-  threat_reasons TEXT NOT NULL DEFAULT '[]',
-  vision_restructured INTEGER NOT NULL DEFAULT 0,
-  table_sig TEXT NOT NULL DEFAULT '{}',
-  features_json TEXT NOT NULL DEFAULT '{}',
-  tau REAL NOT NULL DEFAULT 0,
-  wall TEXT NOT NULL DEFAULT ''
-);
-CREATE VIRTUAL TABLE IF NOT EXISTS episode_fts USING fts5(
-  subject, body, sender, content='episode', content_rowid='rowid'
-);
-CREATE TRIGGER IF NOT EXISTS episode_ai AFTER INSERT ON episode BEGIN
-  INSERT INTO episode_fts(rowid, subject, body, sender)
-  VALUES (new.rowid, new.subject, new.body, new.sender);
-END;
-CREATE TRIGGER IF NOT EXISTS episode_ad AFTER DELETE ON episode BEGIN
-  INSERT INTO episode_fts(episode_fts, rowid, subject, body, sender)
-  VALUES ('delete', old.rowid, old.subject, old.body, old.sender);
-END;
-CREATE INDEX IF NOT EXISTS episode_mid ON episode(message_id);
-CREATE TABLE IF NOT EXISTS _meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
-`;
-
 function uuid(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -106,28 +80,25 @@ function uuid(): string {
 }
 
 export class LocalBrain {
-  private db: SqliteDb | null = null;
+  private db: BrainDb | null = null;
   private tau = 0;
   uuid = "";
   readonly backend: string = "none";
+  private readonly engine: BrainEngine;
 
-  /** Open OPFS-backed db, falling back to memory. Call once. */
+  constructor(engine: BrainEngine = sqliteWasmEngine) {
+    this.engine = engine;
+  }
+
+  /** Open the brain. Call once. Default engine: sqlite-wasm (OPFS if available). */
   async open(name = "positronic", wasmUrl?: string): Promise<string> {
-    const sqlite3 = await this.loadWasm(wasmUrl);
-    if (sqlite3 && "opfs" in sqlite3) {
-      try {
-        this.db = new sqlite3.opfs.OpfsDb(`/${name}.db`);
-        (this as { backend: string }).backend = "opfs";
-      } catch {
-        this.db = null;
-      }
-    }
-    if (!this.db && sqlite3) {
-      this.db = new sqlite3.oo1.DB(`/${name}.db`, "c");
-      (this as { backend: string }).backend = "memory";
-    }
-    if (!this.db) throw new Error("sqlite-wasm unavailable");
-    this.db.exec(SCHEMA);
+    const { db, backend } = await this.engine.open(name, {
+      wasmUrl,
+      load: (u) => this.loadWasm(u),
+    });
+    this.db = db;
+    (this as { backend: string }).backend = backend;
+    this.db.exec(this.engine.dialect.schema());
     const row = this.db.selectValue("SELECT MAX(tau) FROM episode");
     this.tau = typeof row === "number" ? row : 0;
     // Stable brain identity, same contract as the server (meta.brain_uuid).
@@ -148,11 +119,11 @@ export class LocalBrain {
     return this.backend;
   }
 
-  // Overridden in tests to inject a mock; default loads the wasm bundle.
+  // Overridden in tests to inject a mock; the default loads the wasm bundle.
   // The specifier is resolved by the host: bundlers rewrite it, the
   // Thunderbird adapter substitutes the vendored build (see pai-local.js).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected async loadWasm(wasmUrl?: string): Promise<any> {
+  // Only the sqlite-wasm engine calls this (see engine-sqlite.ts).
+  protected async loadWasm(wasmUrl?: string): Promise<unknown> {
     try {
       const mod = await import(
         /* @vite-ignore */ wasmUrl || "@sqlite.org/sqlite-wasm"
@@ -231,24 +202,16 @@ export class LocalBrain {
     if (!this.db) throw new Error("brain not open");
     const q = queryText.replace(/["*]/g, " ").trim();
     if (!q) return { results: [] };
-    const rows = this.db.selectObjects(
-      `SELECT e.id, e.subject, e.body, e.sender, e.message_id,
-              e.threat_tag, e.tau, e.wall,
-              bm25(episode_fts) AS rank
-       FROM episode_fts f JOIN episode e ON e.rowid = f.rowid
-       WHERE episode_fts MATCH ? ORDER BY rank LIMIT ?`,
-      [q, k],
-    ) as Record<string, unknown>[];
     return {
-      results: rows.map((r, i) => ({
-        episode_id: String(r.id),
-        subject: String(r.subject || ""),
-        snippet: String(r.body || "").slice(0, 200),
-        message_id: String(r.message_id || ""),
-        sender: String(r.sender || ""),
+      results: this.engine.dialect.recall(this.db, q, k).map((r, i) => ({
+        episode_id: r.id,
+        subject: r.subject,
+        snippet: r.body.slice(0, 200),
+        message_id: r.message_id,
+        sender: r.sender,
         threat_tag: (r.threat_tag as ThreatTag) || "clean",
-        tau: Number(r.tau),
-        wall: String(r.wall || ""),
+        tau: r.tau,
+        wall: r.wall,
         rrf_score: Math.round((1 / (60 + i + 1)) * 10000) / 10000,
       })),
     };

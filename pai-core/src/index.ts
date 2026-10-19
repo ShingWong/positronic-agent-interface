@@ -51,6 +51,17 @@ export {
   type PositronicEpisode,
 } from "./skill.js";
 export { LocalBrain, type LocalEpisode, type RecallHit } from "./store.js";
+// The storage port, and the default engine behind it. Another engine (e.g.
+// the Turso one at @positronic-ai/pai-core/turso) is a host's choice, which
+// is why it is a separate entry point rather than exported here.
+export type {
+  BrainDb,
+  BrainDialect,
+  BrainEngine,
+  BrainOpenOpts,
+  RecallRow,
+} from "./db.js";
+export { sqliteWasmEngine, sqliteWasmDialect, toRecallRow } from "./engine-sqlite.js";
 export {
   COMPOSE_SKILL,
   COMPOSE_CONTEXT_TOOL_DEF,
