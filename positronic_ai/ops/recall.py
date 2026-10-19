@@ -175,8 +175,11 @@ def _fts_count(db, text) -> int:
         return 0
     try:
         c = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-        n = c.execute("SELECT COUNT(*) FROM episode_fts "
-                      "WHERE episode_fts MATCH ?", (q,)).fetchone()[0]
+        n = c.execute("SELECT COUNT(*) FROM episode_fts f "
+                      "JOIN episode e ON e.id = f.id "
+                      "WHERE episode_fts MATCH ? "
+                      "AND json_extract(e.features_json,"
+                      "'$.superseded_by') IS NULL", (q,)).fetchone()[0]
         c.close()
         return int(n)
     except Exception:  # noqa: BLE001 — count is advisory, never fatal
@@ -207,6 +210,7 @@ def _merge_exhaustive_hits(dir, name, db, text, k, ranked) -> None:
             "SELECT e.id, e.kind, e.features_json, e.tau, e.wall "
             "FROM episode_fts f JOIN episode e ON e.id = f.id "
             "WHERE episode_fts MATCH ? "
+            "AND json_extract(e.features_json,'$.superseded_by') IS NULL "
             "ORDER BY e.tau DESC LIMIT ?", (q, k)).fetchall()
         for i, row in enumerate(rows):
             try:
